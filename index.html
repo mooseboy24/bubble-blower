@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Bubble Blower</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #canvas { display: block; position: fixed; inset: 0; }
+
+  /* Start overlay */
+  #overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 24px;
+    background: radial-gradient(circle at 50% 30%, #7fd8ff 0%, #4aa3ff 45%, #6a5cff 100%);
+    z-index: 20; transition: opacity 0.4s ease;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #title {
+    color: #fff; font-size: clamp(32px, 9vw, 72px); font-weight: 800;
+    text-shadow: 0 4px 0 rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.2);
+    letter-spacing: 1px; text-align: center;
+  }
+  #subtitle { color: rgba(255,255,255,0.95); font-size: clamp(16px, 4vw, 24px); font-weight: 600; }
+  #startBtn {
+    border: none; cursor: pointer; color: #fff; font-weight: 800;
+    font-size: clamp(24px, 7vw, 44px);
+    padding: clamp(20px, 5vw, 36px) clamp(48px, 14vw, 96px);
+    border-radius: 999px;
+    background: linear-gradient(160deg, #ff9a5a 0%, #ff5e7e 55%, #ff3d6e 100%);
+    box-shadow: 0 10px 0 #c93156, 0 18px 40px rgba(0,0,0,0.3);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  #startBtn:active { transform: translateY(8px); box-shadow: 0 2px 0 #c93156, 0 8px 20px rgba(0,0,0,0.3); }
+  .emoji { font-size: clamp(48px, 16vw, 120px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+
+  /* Settings gear */
+  #gear {
+    position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; z-index: 15;
+    width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.18); backdrop-filter: blur(6px);
+    opacity: 0.35; transition: opacity 0.2s ease, transform 0.2s ease; font-size: 24px;
+  }
+  #gear:hover, #gear.open { opacity: 1; transform: rotate(40deg); }
+  #gear.start-hidden { display: none; }
+
+  #panel {
+    position: fixed; top: max(64px, calc(env(safe-area-inset-top) + 56px)); right: 12px; z-index: 16;
+    width: min(280px, 86vw); padding: 18px; border-radius: 18px;
+    background: rgba(20, 24, 48, 0.82); backdrop-filter: blur(12px);
+    color: #fff; box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    transform: translateY(-10px) scale(0.96); opacity: 0; pointer-events: none;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+  }
+  #panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+  #panel h2 { font-size: 16px; margin-bottom: 14px; font-weight: 700; }
+  .row { margin-bottom: 16px; }
+  .row label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; font-weight: 600; }
+  .row .val { opacity: 0.7; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #ff5e7e; height: 24px; }
+  .meter { height: 10px; border-radius: 6px; background: rgba(255,255,255,0.15); overflow: hidden; }
+  .meter > div { height: 100%; width: 0%; background: linear-gradient(90deg, #7fd8ff, #ff5e7e); transition: width 0.05s linear; }
+  .hint { font-size: 11px; opacity: 0.6; line-height: 1.4; margin-top: 4px; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="gear" class="start-hidden" aria-label="Settings">&#9881;</div>
+<div id="panel">
+  <h2>Settings</h2>
+  <div class="row">
+    <label>Mic sensitivity <span class="val" id="sensVal"></span></label>
+    <input type="range" id="sens" min="1" max="100" value="45" />
+    <div class="hint">Higher = bubbles appear with a gentler blow.</div>
+  </div>
+  <div class="row">
+    <label>Blow level <span class="val" id="lvlVal">0%</span></label>
+    <div class="meter"><div id="meterFill"></div></div>
+    <div class="hint">Blow into the mic to test. Bubbles trigger when this passes the line.</div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="emoji">&#128690;</div>
+  <div id="title">Bubble Blower</div>
+  <div id="subtitle">Blow into the mic to make bubbles!</div>
+  <button id="startBtn">Start</button>
+  <div id="subtitle" style="font-size:14px;opacity:0.8">Tap bubbles to pop them</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("canvas");
+  var ctx = canvas.getContext("2d");
+  var overlay = document.getElementById("overlay");
+  var startBtn = document.getElementById("startBtn");
+  var gear = document.getElementById("gear");
+  var panel = document.getElementById("panel");
+  var sens = document.getElementById("sens");
+  var sensVal = document.getElementById("sensVal");
+  var lvlVal = document.getElementById("lvlVal");
+  var meterFill = document.getElementById("meterFill");
+
+  var W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---- Bubbles ----
+  var bubbles = [];
+  var pops = [];
+  var PALETTE = [
+    [255, 159, 200], [159, 214, 255], [186, 255, 201],
+    [255, 233, 150], [206, 178, 255], [150, 245, 230]
+  ];
+
+  function spawnBubble(intensity) {
+    var base = 16 + Math.random() * 26;
+    var r = base * (0.7 + intensity * 1.6);
+    var col = PALETTE[(Math.random() * PALETTE.length) | 0];
+    bubbles.push({
+      x: Math.random() * W,
+      y: H + r + Math.random() * 40,
+      r: r,
+      vy: -(0.5 + Math.random() * 1.2) * (0.8 + intensity),
+      wobbleAmp: 8 + Math.random() * 26,
+      wobbleSpeed: 0.6 + Math.random() * 1.4,
+      phase: Math.random() * Math.PI * 2,
+      col: col,
+      alpha: 0,
+      born: performance.now()
+    });
+  }
+
+  function drawBubble(b) {
+    var c = b.col;
+    var grad = ctx.createRadialGradient(
+      b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.1,
+      b.x, b.y, b.r
+    );
+    grad.addColorStop(0, "rgba(255,255,255," + (0.9 * b.alpha) + ")");
+    grad.addColorStop(0.25, "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (0.55 * b.alpha) + ")");
+    grad.addColorStop(0.85, "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (0.22 * b.alpha) + ")");
+    grad.addColorStop(1, "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0)");
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    // rim
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r * 0.96, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255," + (0.5 * b.alpha) + ")";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // highlight
+    ctx.beginPath();
+    ctx.arc(b.x - b.r * 0.32, b.y - b.r * 0.34, b.r * 0.18, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255," + (0.8 * b.alpha) + ")";
+    ctx.fill();
+  }
+
+  function popBubble(b) {
+    pops.push({ x: b.x, y: b.y, r: b.r, col: b.col, t: 0 });
+  }
+
+  function drawPops() {
+    for (var i = pops.length - 1; i >= 0; i--) {
+      var p = pops[i];
+      p.t += 0.08;
+      if (p.t >= 1) { pops.splice(i, 1); continue; }
+      var n = 8;
+      var spread = p.r * (0.4 + p.t * 1.4);
+      var a = (1 - p.t);
+      for (var k = 0; k < n; k++) {
+        var ang = (k / n) * Math.PI * 2;
+        var dx = Math.cos(ang) * spread;
+        var dy = Math.sin(ang) * spread;
+        ctx.beginPath();
+        ctx.arc(p.x + dx, p.y + dy, Math.max(1, p.r * 0.12 * (1 - p.t)), 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(" + p.col[0] + "," + p.col[1] + "," + p.col[2] + "," + (0.7 * a) + ")";
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.6 + p.t), 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255," + (0.5 * a) + ")";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  // ---- Background ----
+  var bgT = 0;
+  function drawBackground() {
+    bgT += 0.0015;
+    var g = ctx.createLinearGradient(0, 0, W, H);
+    var h1 = (Math.sin(bgT) * 0.5 + 0.5) * 60 + 190;       // blue-ish
+    var h2 = (Math.sin(bgT + 2) * 0.5 + 0.5) * 60 + 280;   // purple/pink
+    g.addColorStop(0, "hsl(" + h1 + ",85%,68%)");
+    g.addColorStop(1, "hsl(" + h2 + ",80%,62%)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // ---- Audio ----
+  var audioCtx = null, analyser = null, freqData = null, timeData = null;
+  var running = false;
+  var smoothedLevel = 0;
+  var spawnAccumulator = 0;
+
+  function setupAudio() {
+    return navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    }).then(function (stream) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var src = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.5;
+      src.connect(analyser);
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+      timeData = new Uint8Array(analyser.fftSize);
+      return audioCtx.resume();
+    });
+  }
+
+  // Returns a 0..1 "blow" intensity biased toward broadband low-frequency energy.
+  function readBlow() {
+    analyser.getByteTimeDomainData(timeData);
+    analyser.getByteFrequencyData(freqData);
+
+    // RMS from time domain
+    var sum = 0;
+    for (var i = 0; i < timeData.length; i++) {
+      var v = (timeData[i] - 128) / 128;
+      sum += v * v;
+    }
+    var rms = Math.sqrt(sum / timeData.length); // ~0..1
+
+    // Frequency analysis: blowing = lots of low/broadband energy, little high tonal peak.
+    var nyquist = audioCtx.sampleRate / 2;
+    var binHz = nyquist / freqData.length;
+    var lowSum = 0, lowCount = 0, highSum = 0, highCount = 0;
+    for (var b = 0; b < freqData.length; b++) {
+      var hz = b * binHz;
+      var mag = freqData[b] / 255;
+      if (hz < 600) { lowSum += mag; lowCount++; }
+      else if (hz > 2000 && hz < 8000) { highSum += mag; highCount++; }
+    }
+    var lowAvg = lowCount ? lowSum / lowCount : 0;
+    var highAvg = highCount ? highSum / highCount : 0;
+
+    // Blowing has strong low energy. Speech/whistle adds more high-band structure,
+    // so subtract a portion of high energy to suppress false triggers.
+    var lowBias = Math.max(0, lowAvg - highAvg * 0.6);
+
+    // Combine RMS loudness with low-frequency bias.
+    var blow = rms * 1.4 * (0.4 + lowBias * 2.2);
+    return Math.min(1, blow);
+  }
+
+  function loop() {
+    drawBackground();
+
+    if (running && analyser) {
+      var raw = readBlow();
+      // smooth to avoid flicker
+      smoothedLevel += (raw - smoothedLevel) * 0.35;
+
+      // threshold from sensitivity slider (1..100 -> high..low threshold)
+      var s = parseInt(sens.value, 10);
+      var threshold = 0.32 - (s / 100) * 0.28; // s=1 -> 0.317, s=100 -> 0.04
+
+      var over = smoothedLevel - threshold;
+      if (over > 0) {
+        var intensity = Math.min(1, over / 0.25);
+        // spawn rate scales with intensity
+        spawnAccumulator += intensity * 1.6 + 0.2;
+        while (spawnAccumulator >= 1) {
+          spawnBubble(intensity);
+          spawnAccumulator -= 1;
+        }
+      }
+
+      // meter UI (only matters when panel open, cheap anyway)
+      var pct = Math.min(100, Math.round((smoothedLevel / 0.35) * 100));
+      meterFill.style.width = pct + "%";
+      lvlVal.textContent = pct + "%";
+    }
+
+    // update + draw bubbles
+    var now = performance.now();
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var b = bubbles[i];
+      var age = (now - b.born) / 1000;
+      b.alpha = Math.min(1, age * 4);
+      b.y += b.vy;
+      b.phase += 0.016 * b.wobbleSpeed;
+      b.x += Math.sin(b.phase) * (b.wobbleAmp * 0.04);
+      if (b.y + b.r < -20) { bubbles.splice(i, 1); continue; }
+      drawBubble(b);
+    }
+    if (bubbles.length > 400) bubbles.splice(0, bubbles.length - 400);
+
+    drawPops();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- Interaction: pop bubbles ----
+  function hitTest(x, y) {
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var b = bubbles[i];
+      var dx = x - b.x, dy = y - b.y;
+      if (dx * dx + dy * dy <= b.r * b.r) {
+        popBubble(b);
+        bubbles.splice(i, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+  canvas.addEventListener("pointerdown", function (e) {
+    hitTest(e.clientX, e.clientY);
+  });
+
+  // ---- Settings ----
+  function updateSensLabel() { sensVal.textContent = sens.value; }
+  sens.addEventListener("input", updateSensLabel);
+  updateSensLabel();
+
+  gear.addEventListener("click", function () {
+    panel.classList.toggle("open");
+    gear.classList.toggle("open");
+  });
+
+  // ---- Start ----
+  startBtn.addEventListener("click", function () {
+    startBtn.disabled = true;
+    startBtn.textContent = "Starting...";
+    setupAudio().then(function () {
+      running = true;
+      overlay.classList.add("hidden");
+      gear.classList.remove("start-hidden");
+    }).catch(function (err) {
+      startBtn.disabled = false;
+      startBtn.textContent = "Start";
+      var sub = overlay.querySelector("#subtitle");
+      if (sub) sub.textContent = "Microphone blocked. Allow mic access and tap Start.";
+      console.error("Mic error:", err);
+    });
+  });
+
+  // animation runs always (background visible behind overlay)
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
