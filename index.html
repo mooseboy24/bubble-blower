@@ -69,6 +69,13 @@
   .meter { height: 10px; border-radius: 6px; background: rgba(255,255,255,0.15); overflow: hidden; }
   .meter > div { height: 100%; width: 0%; background: linear-gradient(90deg, #7fd8ff, #ff5e7e); transition: width 0.05s linear; }
   .hint { font-size: 11px; opacity: 0.6; line-height: 1.4; margin-top: 4px; }
+  .seg { display: flex; gap: 6px; background: rgba(255,255,255,0.1); padding: 4px; border-radius: 12px; }
+  .seg button {
+    flex: 1; border: none; cursor: pointer; padding: 11px 6px; border-radius: 9px;
+    font-weight: 700; font-size: 13px; color: #fff; background: transparent;
+    transition: background 0.15s ease;
+  }
+  .seg button.active { background: linear-gradient(160deg, #ff9a5a, #ff5e7e); box-shadow: 0 3px 10px rgba(0,0,0,0.25); }
 </style>
 </head>
 <body>
@@ -86,6 +93,14 @@
     <label>Bubble amount <span class="val" id="amtVal"></span></label>
     <input type="range" id="amount" min="1" max="100" value="40" />
     <div class="hint">Higher = more bubbles per blow.</div>
+  </div>
+  <div class="row">
+    <label>Bubble size</label>
+    <div class="seg" id="sizeSeg">
+      <button type="button" data-mode="blow" class="active">Blow-linked</button>
+      <button type="button" data-mode="random">Random</button>
+    </div>
+    <div class="hint">Blow-linked: softer blow = smaller bubbles. Random: surprise sizes.</div>
   </div>
   <div class="row">
     <label>Blow level <span class="val" id="lvlVal">0%</span></label>
@@ -140,9 +155,15 @@
     [255, 233, 150], [206, 178, 255], [150, 245, 230]
   ];
 
+  var sizeMode = "blow"; // "blow" = size follows intensity, "random" = surprise sizes
+
   function spawnBubble(intensity) {
-    var base = 16 + Math.random() * 26;
-    var r = base * (0.7 + intensity * 1.6);
+    var r;
+    if (sizeMode === "random") {
+      r = 14 + Math.random() * 54;                       // fully random size
+    } else {
+      r = (14 + intensity * 58) * (0.85 + Math.random() * 0.3); // softer blow = smaller
+    }
     var col = PALETTE[(Math.random() * PALETTE.length) | 0];
     bubbles.push({
       x: Math.random() * W,
@@ -384,6 +405,16 @@
   amount.addEventListener("input", updateAmtLabel);
   updateSensLabel();
   updateAmtLabel();
+
+  var sizeSeg = document.getElementById("sizeSeg");
+  sizeSeg.addEventListener("click", function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    sizeMode = btn.getAttribute("data-mode");
+    for (var i = 0; i < sizeSeg.children.length; i++) {
+      sizeSeg.children[i].classList.toggle("active", sizeSeg.children[i] === btn);
+    }
+  });
 
   gear.addEventListener("click", function () {
     panel.classList.toggle("open");
