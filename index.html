@@ -79,13 +79,18 @@
   <h2>Settings</h2>
   <div class="row">
     <label>Mic sensitivity <span class="val" id="sensVal"></span></label>
-    <input type="range" id="sens" min="1" max="100" value="82" />
-    <div class="hint">Higher = bubbles appear with a gentler blow.</div>
+    <input type="range" id="sens" min="1" max="100" value="92" />
+    <div class="hint">Higher = even a tiny, quiet blow makes bubbles.</div>
+  </div>
+  <div class="row">
+    <label>Bubble amount <span class="val" id="amtVal"></span></label>
+    <input type="range" id="amount" min="1" max="100" value="40" />
+    <div class="hint">Higher = more bubbles per blow.</div>
   </div>
   <div class="row">
     <label>Blow level <span class="val" id="lvlVal">0%</span></label>
     <div class="meter"><div id="meterFill"></div></div>
-    <div class="hint">Blow into the mic to test. Bubbles trigger when this passes the line.</div>
+    <div class="hint">Blow into the mic to test the sensitivity.</div>
   </div>
 </div>
 
@@ -109,6 +114,8 @@
   var panel = document.getElementById("panel");
   var sens = document.getElementById("sens");
   var sensVal = document.getElementById("sensVal");
+  var amount = document.getElementById("amount");
+  var amtVal = document.getElementById("amtVal");
   var lvlVal = document.getElementById("lvlVal");
   var meterFill = document.getElementById("meterFill");
 
@@ -310,23 +317,27 @@
       // smooth to avoid flicker
       smoothedLevel += (raw - smoothedLevel) * 0.35;
 
-      // threshold from sensitivity slider (1..100 -> high..low threshold)
-      var s = parseInt(sens.value, 10);
-      var threshold = 0.26 - (s / 100) * 0.255; // s=1 -> 0.257, s=82 -> 0.051, s=100 -> 0.005
+      // Sensitivity amplifies quiet blows: gain 1x (low) up to 12x (max),
+      // so a very small/soft breath still clears the tiny fixed floor.
+      var s = parseInt(sens.value, 10);            // 1..100
+      var gain = 1 + (s / 100) * 11;               // 1 .. 12
+      var level = smoothedLevel * gain;
+      var threshold = 0.05;                        // small fixed floor
 
-      var over = smoothedLevel - threshold;
+      var over = level - threshold;
       if (over > 0) {
-        var intensity = Math.min(1, over / 0.25);
-        // spawn rate scales with intensity (kept low so each blow makes only a few)
-        spawnAccumulator += intensity * 0.45 + 0.05;
+        var intensity = Math.min(1, over / 0.4);
+        // amount slider scales how many bubbles per blow (40 = ~1x)
+        var amt = parseInt(amount.value, 10) / 40; // 0.025 .. 2.5
+        spawnAccumulator += (intensity * 0.45 + 0.05) * amt;
         while (spawnAccumulator >= 1) {
           spawnBubble(intensity);
           spawnAccumulator -= 1;
         }
       }
 
-      // meter UI (only matters when panel open, cheap anyway)
-      var pct = Math.min(100, Math.round((smoothedLevel / 0.35) * 100));
+      // meter UI (shows amplified level so it lines up with what triggers)
+      var pct = Math.min(100, Math.round(level * 100));
       meterFill.style.width = pct + "%";
       lvlVal.textContent = pct + "%";
     }
@@ -368,8 +379,11 @@
 
   // ---- Settings ----
   function updateSensLabel() { sensVal.textContent = sens.value; }
+  function updateAmtLabel() { amtVal.textContent = amount.value; }
   sens.addEventListener("input", updateSensLabel);
+  amount.addEventListener("input", updateAmtLabel);
   updateSensLabel();
+  updateAmtLabel();
 
   gear.addEventListener("click", function () {
     panel.classList.toggle("open");
