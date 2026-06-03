@@ -79,7 +79,7 @@
   <h2>Settings</h2>
   <div class="row">
     <label>Mic sensitivity <span class="val" id="sensVal"></span></label>
-    <input type="range" id="sens" min="1" max="100" value="45" />
+    <input type="range" id="sens" min="1" max="100" value="82" />
     <div class="hint">Higher = bubbles appear with a gentler blow.</div>
   </div>
   <div class="row">
@@ -312,13 +312,13 @@
 
       // threshold from sensitivity slider (1..100 -> high..low threshold)
       var s = parseInt(sens.value, 10);
-      var threshold = 0.32 - (s / 100) * 0.28; // s=1 -> 0.317, s=100 -> 0.04
+      var threshold = 0.26 - (s / 100) * 0.255; // s=1 -> 0.257, s=82 -> 0.051, s=100 -> 0.005
 
       var over = smoothedLevel - threshold;
       if (over > 0) {
         var intensity = Math.min(1, over / 0.25);
-        // spawn rate scales with intensity
-        spawnAccumulator += intensity * 1.6 + 0.2;
+        // spawn rate scales with intensity (kept low so each blow makes only a few)
+        spawnAccumulator += intensity * 0.45 + 0.05;
         while (spawnAccumulator >= 1) {
           spawnBubble(intensity);
           spawnAccumulator -= 1;
