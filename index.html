@@ -156,6 +156,14 @@
   ];
 
   var sizeMode = "blow"; // "blow" = size follows intensity, "random" = surprise sizes
+  var blowPulse = 0;     // 0..1 smoothed, makes the wand ring shimmer when blowing
+
+  // The bubble wand: handle at the bottom, ring near lower-center. Bubbles
+  // are born from inside this ring so they look blown off the wand.
+  function wandRing() {
+    var R = Math.max(34, Math.min(W, H) * 0.085);
+    return { x: W * 0.5, y: H * 0.72, r: R * (1 + blowPulse * 0.12) };
+  }
 
   function spawnBubble(intensity) {
     var r;
@@ -165,9 +173,13 @@
       r = (14 + intensity * 58) * (0.85 + Math.random() * 0.3); // softer blow = smaller
     }
     var col = PALETTE[(Math.random() * PALETTE.length) | 0];
+    // spawn somewhere inside the wand ring
+    var ring = wandRing();
+    var a = Math.random() * Math.PI * 2;
+    var rad = Math.random() * ring.r * 0.65;
     bubbles.push({
-      x: Math.random() * W,
-      y: H + r + Math.random() * 40,
+      x: ring.x + Math.cos(a) * rad,
+      y: ring.y + Math.sin(a) * rad,
       r: r,
       vy: -(0.5 + Math.random() * 1.2) * (0.8 + intensity),
       wobbleAmp: 8 + Math.random() * 26,
@@ -233,6 +245,49 @@
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+  }
+
+  // ---- Wand ----
+  function drawWand() {
+    var ring = wandRing();
+    ctx.save();
+    ctx.lineCap = "round";
+
+    // handle: thick rounded stick from below the ring down off-screen
+    var hg = ctx.createLinearGradient(0, ring.y, 0, H);
+    hg.addColorStop(0, "#ffd36e");
+    hg.addColorStop(1, "#ff7eb3");
+    ctx.strokeStyle = hg;
+    ctx.lineWidth = Math.max(12, ring.r * 0.42);
+    ctx.beginPath();
+    ctx.moveTo(ring.x, ring.y + ring.r * 0.92);
+    ctx.lineTo(ring.x, H + 20);
+    ctx.stroke();
+
+    // soapy film shimmer inside the ring
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, ring.r * 0.86, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255," + (0.06 + blowPulse * 0.12) + ")";
+    ctx.fill();
+
+    // ring (the loop) — colorful soft band
+    var rg = ctx.createLinearGradient(
+      ring.x - ring.r, ring.y - ring.r, ring.x + ring.r, ring.y + ring.r);
+    rg.addColorStop(0, "#7fd8ff");
+    rg.addColorStop(1, "#c89bff");
+    ctx.strokeStyle = rg;
+    ctx.lineWidth = Math.max(7, ring.r * 0.24);
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // glossy highlight on the ring
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = Math.max(2, ring.r * 0.07);
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, ring.r, -Math.PI * 0.85, -Math.PI * 0.35);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // ---- Background ----
@@ -357,11 +412,19 @@
         }
       }
 
+      // wand ring shimmer follows the blow level
+      blowPulse += (Math.min(1, level) - blowPulse) * 0.25;
+
       // meter UI (shows amplified level so it lines up with what triggers)
       var pct = Math.min(100, Math.round(level * 100));
       meterFill.style.width = pct + "%";
       lvlVal.textContent = pct + "%";
+    } else {
+      blowPulse += (0 - blowPulse) * 0.1;
     }
+
+    // the wand sits behind the bubbles so they float up out of the ring
+    drawWand();
 
     // update + draw bubbles
     var now = performance.now();
