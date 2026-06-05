@@ -162,7 +162,7 @@
   // are born from inside this ring so they look blown off the wand.
   function wandRing() {
     var R = Math.max(34, Math.min(W, H) * 0.085);
-    return { x: W * 0.5, y: H * 0.72, r: R * (1 + blowPulse * 0.12) };
+    return { x: W * 0.5, y: H * 0.88, r: R * (1 + blowPulse * 0.12) };
   }
 
   function spawnBubble(intensity) {
@@ -175,16 +175,20 @@
     var col = PALETTE[(Math.random() * PALETTE.length) | 0];
     // spawn somewhere inside the wand ring
     var ring = wandRing();
-    var a = Math.random() * Math.PI * 2;
+    var sa = Math.random() * Math.PI * 2;
     var rad = Math.random() * ring.r * 0.65;
+    var speedScale = 0.7 + intensity * 0.9;
     bubbles.push({
-      x: ring.x + Math.cos(a) * rad,
-      y: ring.y + Math.sin(a) * rad,
+      x: ring.x + Math.cos(sa) * rad,
+      y: ring.y + Math.sin(sa) * rad,
       r: r,
-      vy: -(0.5 + Math.random() * 1.2) * (0.8 + intensity),
-      wobbleAmp: 8 + Math.random() * 26,
+      vx: (Math.random() * 2 - 1) * 2.0 * speedScale,  // fan out to the sides
+      vy: -(0.15 + Math.random() * 1.5) * speedScale,  // up, some nearly flat
+      buoyancy: -(0.006 + Math.random() * 0.018),      // gentle continuous lift
+      wobbleAmp: 6 + Math.random() * 18,
       wobbleSpeed: 0.6 + Math.random() * 1.4,
       phase: Math.random() * Math.PI * 2,
+      maxLife: 3 + Math.random() * 7,                  // seconds before it pops on its own
       col: col,
       alpha: 0,
       born: performance.now()
@@ -432,10 +436,28 @@
       var b = bubbles[i];
       var age = (now - b.born) / 1000;
       b.alpha = Math.min(1, age * 4);
-      b.y += b.vy;
+
+      // physics: gentle lift + drag so they fan out, float around, then drift off
+      b.vy += b.buoyancy;
+      b.vx *= 0.99;
+      b.vy *= 0.996;
       b.phase += 0.016 * b.wobbleSpeed;
-      b.x += Math.sin(b.phase) * (b.wobbleAmp * 0.04);
+      b.x += b.vx + Math.sin(b.phase) * (b.wobbleAmp * 0.03);
+      b.y += b.vy;
+
+      // floated off the top -> just gone (no pop)
       if (b.y + b.r < -20) { bubbles.splice(i, 1); continue; }
+
+      // pop when it bumps a side wall or the floor
+      if (b.x - b.r < 0 || b.x + b.r > W || b.y - b.r > H) {
+        popBubble(b); bubbles.splice(i, 1); continue;
+      }
+
+      // natural self-pops: when its little life runs out, plus a rare mid-air pop
+      if (age > b.maxLife || Math.random() < 0.0012) {
+        popBubble(b); bubbles.splice(i, 1); continue;
+      }
+
       drawBubble(b);
     }
     if (bubbles.length > 400) bubbles.splice(0, bubbles.length - 400);
