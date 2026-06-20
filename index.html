@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<title>Bubble Blower</title>
+<title>Bubbles &amp; Birdies</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -87,10 +87,30 @@
     .row { margin-bottom: 11px; }
     .hint { margin-top: 3px; }
   }
+
+  /* Tab bar (switch between Bubbles and Birdies) */
+  #tabs {
+    position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%;
+    transform: translateX(-50%); z-index: 25;
+    display: flex; gap: 6px; padding: 5px; border-radius: 999px;
+    background: rgba(255,255,255,0.22); backdrop-filter: blur(8px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+  .tab {
+    border: none; cursor: pointer; font-weight: 800; font-size: 15px; color: #fff;
+    padding: 9px 16px; border-radius: 999px; background: transparent; white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .tab.active { background: #fff; color: #5b3df5; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
 </style>
 </head>
 <body>
 <canvas id="canvas"></canvas>
+
+<div id="tabs">
+  <button type="button" id="tabBubbles" class="tab active">&#129705; Bubbles</button>
+  <button type="button" id="tabBirds" class="tab">&#128038; Birdies</button>
+</div>
 
 <div id="gear" class="start-hidden" aria-label="Settings">&#9881;</div>
 <div id="panel">
@@ -433,7 +453,273 @@
     return Math.min(1, blow);
   }
 
+  // ===================== BIRDS =====================
+  var screen = "bubbles";          // "bubbles" | "birds"
+  var birds = [];
+  var clouds = [];
+  var actx = null;                 // separate AudioContext for chirps (no mic needed)
+
+  var BIRD_KINDS = [
+    { body: "#e74c3c", wing: "#c0392b", belly: "#ffe0c2", chirp: 880 },  // red
+    { body: "#3aa0e8", wing: "#2c7fc0", belly: "#eaf6ff", chirp: 720 },  // blue
+    { body: "#f4c20d", wing: "#d9a800", belly: "#fff6c0", chirp: 1040 }, // yellow
+    { body: "#2ecc71", wing: "#27a85d", belly: "#e8ffe8", chirp: 640 },  // green
+    { body: "#9b59b6", wing: "#7d3f97", belly: "#f3e6ff", chirp: 980 },  // purple
+    { body: "#ff7fb0", wing: "#e85f95", belly: "#ffe6f0", chirp: 1160 }  // pink
+  ];
+
+  function skyTop() { return 56; }
+  function skyBottom() { return H * 0.72; }
+  function clampX(v) { return Math.max(30, Math.min(W - 30, v)); }
+  function clampY(v) { return Math.max(skyTop(), Math.min(skyBottom(), v)); }
+
+  function newWanderTarget(b) {
+    b.tx = clampX(40 + Math.random() * (W - 80));
+    b.ty = clampY(skyTop() + Math.random() * (skyBottom() - skyTop()));
+  }
+
+  function spawnBird(o) {
+    var k = BIRD_KINDS[(Math.random() * BIRD_KINDS.length) | 0];
+    birds.push({
+      x: o.x, y: o.y, tx: o.tx, ty: o.ty,
+      vx: 0, vy: 0, size: 0.85 + Math.random() * 0.55,
+      kind: k, flap: Math.random() * 6.28, dir: 1, bob: Math.random() * 6.28,
+      spin: 0, pause: 0
+    });
+  }
+
+  function initBirds() {
+    for (var i = 0; i < 4; i++) {
+      var bx = 60 + Math.random() * (W - 120);
+      var by = skyTop() + Math.random() * (skyBottom() - skyTop());
+      spawnBird({ x: bx, y: by, tx: bx, ty: by });
+    }
+  }
+
+  function initClouds() {
+    clouds = [];
+    for (var i = 0; i < 4; i++) {
+      clouds.push({
+        x: Math.random() * W, y: 40 + Math.random() * H * 0.35,
+        s: 0.7 + Math.random() * 0.8, spd: 0.08 + Math.random() * 0.18
+      });
+    }
+  }
+
+  function ensureAudio() {
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { /* no audio is fine */ }
+  }
+
+  // Two quick rising-then-settling notes = a cute tweet. Pitch varies by bird.
+  function chirp(base) {
+    if (!actx) return;
+    var t = actx.currentTime;
+    for (var n = 0; n < 2; n++) {
+      var o = actx.createOscillator();
+      var g = actx.createGain();
+      o.type = "triangle";
+      var f0 = base * (n === 0 ? 1 : 1.18);
+      var st = t + n * 0.12;
+      o.frequency.setValueAtTime(f0 * 0.9, st);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.5, st + 0.05);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.05, st + 0.11);
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.2, st + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.13);
+      o.connect(g); g.connect(actx.destination);
+      o.start(st); o.stop(st + 0.16);
+    }
+  }
+
+  function drawCloud(x, y, s) {
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath();
+    ctx.arc(x, y, 22 * s, 0, Math.PI * 2);
+    ctx.arc(x + 26 * s, y + 6 * s, 18 * s, 0, Math.PI * 2);
+    ctx.arc(x - 26 * s, y + 6 * s, 16 * s, 0, Math.PI * 2);
+    ctx.arc(x, y + 10 * s, 24 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawSky() {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#7ec8ff");
+    g.addColorStop(0.7, "#bfe9ff");
+    g.addColorStop(1, "#e8f8ff");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // sun with soft glow
+    var sx = W * 0.84, sy = H * 0.16, sr = Math.min(W, H) * 0.08;
+    var sg = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 2.6);
+    sg.addColorStop(0, "rgba(255,247,200,0.95)");
+    sg.addColorStop(0.3, "rgba(255,236,150,0.8)");
+    sg.addColorStop(1, "rgba(255,236,150,0)");
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, sr * 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff3b0"; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+
+    // drifting clouds
+    for (var i = 0; i < clouds.length; i++) {
+      var c = clouds[i];
+      c.x += c.spd;
+      if (c.x - 90 * c.s > W) c.x = -90 * c.s;
+      drawCloud(c.x, c.y, c.s);
+    }
+
+    // rolling grassy ground
+    var gy = H * 0.86;
+    ctx.fillStyle = "#8fd96b";
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.quadraticCurveTo(W * 0.25, gy - 22, W * 0.5, gy);
+    ctx.quadraticCurveTo(W * 0.75, gy + 22, W, gy - 8);
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawBird(b) {
+    var k = b.kind;
+    var wing = Math.sin(b.flap);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.spin);             // 0 normally; spins during the happy flip
+    ctx.scale(b.dir * b.size, b.size);
+
+    // tail
+    ctx.fillStyle = k.wing;
+    ctx.beginPath();
+    ctx.moveTo(-12, -2); ctx.lineTo(-26, -9); ctx.lineTo(-23, 5); ctx.closePath();
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = k.body;
+    ctx.beginPath(); ctx.ellipse(0, 0, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
+
+    // belly
+    ctx.fillStyle = k.belly;
+    ctx.beginPath(); ctx.ellipse(2, 4, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
+
+    // flapping wing
+    ctx.fillStyle = k.wing;
+    ctx.save();
+    ctx.translate(-1, -3);
+    ctx.rotate(-0.5 + wing * 0.7);
+    ctx.beginPath(); ctx.ellipse(0, 0, 11, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // head
+    ctx.fillStyle = k.body;
+    ctx.beginPath(); ctx.arc(12, -6, 9, 0, Math.PI * 2); ctx.fill();
+
+    // beak
+    ctx.fillStyle = "#ff9f1c";
+    ctx.beginPath();
+    ctx.moveTo(19, -7); ctx.lineTo(29, -5); ctx.lineTo(19, -3); ctx.closePath();
+    ctx.fill();
+
+    // eye
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(14, -8, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#222";
+    ctx.beginPath(); ctx.arc(15, -8, 1.6, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function updateAndDrawBirds() {
+    for (var i = birds.length - 1; i >= 0; i--) {
+      var b = birds[i];
+      var dx = b.tx - b.x, dy = b.ty - b.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var accel = 0.22;
+      b.vx += (dx / dist) * accel;
+      b.vy += (dy / dist) * accel;
+      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      var maxsp = 3.6;
+      if (sp > maxsp) { b.vx *= maxsp / sp; b.vy *= maxsp / sp; }
+      b.vx *= 0.93; b.vy *= 0.93;
+      b.bob += 0.12;
+      b.x += b.vx;
+      b.y += b.vy + Math.sin(b.bob) * 0.4;
+      if (Math.abs(b.vx) > 0.35) b.dir = b.vx > 0 ? 1 : -1;
+      b.flap += 0.18 + sp * 0.12;
+      if (b.spin > 0.01) b.spin *= 0.86; else b.spin = 0;
+
+      // when it reaches its target, pause a bit then pick a new spot to wander to
+      if (dist < 38) {
+        b.pause += 1;
+        if (b.pause > 25 + Math.random() * 70) { newWanderTarget(b); b.pause = 0; }
+      }
+      drawBird(b);
+    }
+  }
+
+  function birdAt(x, y) {
+    for (var i = birds.length - 1; i >= 0; i--) {
+      var b = birds[i];
+      var dx = x - b.x, dy = y - b.y, rr = 26 * b.size;
+      if (dx * dx + dy * dy <= rr * rr) return b;
+    }
+    return null;
+  }
+
+  function scatterFrom(x, y) {
+    for (var i = 0; i < birds.length; i++) {
+      var b = birds[i];
+      var dx = b.x - x, dy = b.y - y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      b.tx = clampX(b.x + dx / d * 220 + (Math.random() - 0.5) * 120);
+      b.ty = clampY(b.y + dy / d * 160 + (Math.random() - 0.5) * 80);
+      b.pause = 0;
+    }
+  }
+
+  function nudgeNearest(x, y, n) {
+    var arr = birds.slice().sort(function (a, c) {
+      return ((a.x - x) * (a.x - x) + (a.y - y) * (a.y - y)) -
+             ((c.x - x) * (c.x - x) + (c.y - y) * (c.y - y));
+    });
+    for (var i = 0; i < Math.min(n, arr.length); i++) {
+      arr[i].tx = clampX(x); arr[i].ty = clampY(y); arr[i].pause = 0;
+    }
+  }
+
+  // tap a bird -> happy chirp + flip + the flock scatters
+  // tap the sky -> a new bird flutters in + nearby birds flock over
+  function birdTap(x, y) {
+    ensureAudio();
+    var b = birdAt(x, y);
+    if (b) {
+      chirp(b.kind.chirp);
+      b.spin = Math.PI * 2;
+      b.vy -= 4.5; b.vx += (Math.random() - 0.5) * 3;
+      scatterFrom(x, y);
+    } else {
+      if (birds.length < 18) {
+        var left = x, right = W - x, top = y, bot = H - y;
+        var m = Math.min(left, right, top, bot);
+        var ex, ey;
+        if (m === left) { ex = -50; ey = y; }
+        else if (m === right) { ex = W + 50; ey = y; }
+        else if (m === top) { ex = x; ey = -50; }
+        else { ex = x; ey = H + 50; }
+        spawnBird({ x: ex, y: ey, tx: clampX(x), ty: clampY(y) });
+      }
+      nudgeNearest(x, y, 3);
+      chirp(640 + Math.random() * 360);
+    }
+  }
+  // =================== END BIRDS ====================
+
   function loop() {
+    if (screen === "birds") {
+      drawSky();
+      updateAndDrawBirds();
+      requestAnimationFrame(loop);
+      return;
+    }
+
     drawBackground();
 
     if (running && analyser) {
@@ -527,6 +813,7 @@
     return false;
   }
   canvas.addEventListener("pointerdown", function (e) {
+    if (screen === "birds") { birdTap(e.clientX, e.clientY); return; }
     hitTest(e.clientX, e.clientY);
   });
 
@@ -584,7 +871,45 @@
     });
   });
 
+  // ---- Tabs ----
+  var tabBubbles = document.getElementById("tabBubbles");
+  var tabBirds = document.getElementById("tabBirds");
+
+  function applyScreen() {
+    tabBubbles.classList.toggle("active", screen === "bubbles");
+    tabBirds.classList.toggle("active", screen === "birds");
+    if (screen === "birds") {
+      overlay.classList.add("hidden");
+      panel.classList.remove("open");
+      gear.classList.remove("open");
+      gear.classList.add("start-hidden");   // no mic settings in the birds game
+    } else {
+      if (running) {
+        overlay.classList.add("hidden");
+        gear.classList.remove("start-hidden");
+      } else {
+        overlay.classList.remove("hidden");  // let them Start the mic for bubbles
+        gear.classList.add("start-hidden");
+      }
+    }
+  }
+
+  tabBirds.addEventListener("click", function () {
+    screen = "birds";
+    ensureAudio();                 // tap is a user gesture -> ok to start audio
+    if (birds.length === 0) initBirds();
+    applyScreen();
+  });
+  tabBubbles.addEventListener("click", function () {
+    screen = "bubbles";
+    applyScreen();
+  });
+
+  // when the mic starts, refresh tab UI (so the gear shows on the bubbles tab)
+  startBtn.addEventListener("click", function () { setTimeout(applyScreen, 0); });
+
   // animation runs always (background visible behind overlay)
+  initClouds();
   requestAnimationFrame(loop);
 })();
 </script>
