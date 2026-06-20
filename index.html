@@ -52,7 +52,7 @@
   #gear:hover, #gear.open { opacity: 1; transform: rotate(40deg); }
   #gear.start-hidden { display: none; }
 
-  #panel, #birdPanel, #calmPanel {
+  #panel, #birdPanel, #calmPanel, #animalPanel, #pianoPanel, #dayPanel, #starPanel, #feelPanel {
     position: fixed; top: max(64px, calc(env(safe-area-inset-top) + 56px)); right: 12px; z-index: 16;
     width: min(280px, 86vw); padding: 18px; border-radius: 18px;
     /* keep the panel inside the screen on small phones and let it scroll */
@@ -64,8 +64,8 @@
     transform: translateY(-10px) scale(0.96); opacity: 0; pointer-events: none;
     transition: transform 0.18s ease, opacity 0.18s ease;
   }
-  #panel.open, #birdPanel.open, #calmPanel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-  #panel h2, #birdPanel h2, #calmPanel h2 { font-size: 16px; margin-bottom: 14px; font-weight: 700; }
+  #panel.open, #birdPanel.open, #calmPanel.open, #animalPanel.open, #pianoPanel.open, #dayPanel.open, #starPanel.open, #feelPanel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+  #panel h2, #birdPanel h2, #calmPanel h2, #animalPanel h2, #pianoPanel h2, #dayPanel h2, #starPanel h2, #feelPanel h2 { font-size: 16px; margin-bottom: 14px; font-weight: 700; }
   .row { margin-bottom: 16px; }
   .row label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; font-weight: 600; }
   .row .val { opacity: 0.7; font-variant-numeric: tabular-nums; }
@@ -82,24 +82,28 @@
   .seg button.active { background: linear-gradient(160deg, #ff9a5a, #ff5e7e); box-shadow: 0 3px 10px rgba(0,0,0,0.25); }
   /* tighten spacing on short phone screens so the whole panel fits */
   @media (max-height: 740px) {
-    #panel, #birdPanel, #calmPanel { padding: 14px; }
-    #panel h2, #birdPanel h2, #calmPanel h2 { margin-bottom: 10px; }
+    #panel, #birdPanel, #calmPanel, #animalPanel, #pianoPanel, #dayPanel, #starPanel, #feelPanel { padding: 14px; }
+    #panel h2, #birdPanel h2, #calmPanel h2, #animalPanel h2, #pianoPanel h2, #dayPanel h2, #starPanel h2, #feelPanel h2 { margin-bottom: 10px; }
     .row { margin-bottom: 11px; }
     .hint { margin-top: 3px; }
   }
 
-  /* Tab bar (switch between Bubbles and Birdies) */
+  /* Tab bar: 8 modes, horizontally scrollable on narrow screens */
   #tabs {
-    position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%;
-    transform: translateX(-50%); z-index: 25;
+    position: fixed; top: max(10px, env(safe-area-inset-top)); left: 0; right: 0;
+    width: max-content; max-width: calc(100vw - 16px); margin: 0 auto; z-index: 25;
     display: flex; gap: 6px; padding: 5px; border-radius: 999px;
     background: rgba(255,255,255,0.22); backdrop-filter: blur(8px);
     box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain; scrollbar-width: none;
   }
+  #tabs::-webkit-scrollbar { display: none; }
   .tab {
+    flex: 0 0 auto;
     border: none; cursor: pointer; font-weight: 800; font-size: 14px; color: #fff;
-    padding: 8px 13px; border-radius: 999px; background: transparent; white-space: nowrap;
-    transition: background 0.15s ease, color 0.15s ease;
+    padding: 9px 14px; min-height: 40px; border-radius: 999px; background: transparent;
+    white-space: nowrap; transition: background 0.15s ease, color 0.15s ease;
   }
   .tab.active { background: #fff; color: #5b3df5; box-shadow: 0 3px 10px rgba(0,0,0,0.18); }
 </style>
@@ -108,9 +112,14 @@
 <canvas id="canvas"></canvas>
 
 <div id="tabs">
-  <button type="button" id="tabBubbles" class="tab active">&#129705; Bubbles</button>
-  <button type="button" id="tabBirds" class="tab">&#128038; Birdies</button>
-  <button type="button" id="tabCalm" class="tab">&#127769; Calm</button>
+  <button type="button" class="tab active" data-screen="bubbles">&#129705; Bubbles</button>
+  <button type="button" class="tab" data-screen="birds">&#128038; Birdies</button>
+  <button type="button" class="tab" data-screen="animals">&#128046; Animals</button>
+  <button type="button" class="tab" data-screen="piano">&#127929; Piano</button>
+  <button type="button" class="tab" data-screen="daynight">&#127767; Day/Night</button>
+  <button type="button" class="tab" data-screen="stardust">&#10024; Stardust</button>
+  <button type="button" class="tab" data-screen="feelings">&#128522; Feelings</button>
+  <button type="button" class="tab" data-screen="calm">&#127769; Calm</button>
 </div>
 
 <div id="gear" class="start-hidden" aria-label="Settings">&#9881;</div>
@@ -221,6 +230,177 @@
       <button type="button" data-mode="off" class="active">Off</button>
     </div>
     <div class="hint">Go fullscreen and stop keys from reaching the browser, so he can mash the keyboard safely. Turn Off (or press Esc) to exit. Note: macOS system shortcuts like Cmd+Tab can't be blocked by a webpage — use Guided Access on iPad for a full lock.</div>
+  </div>
+</div>
+
+<div id="animalPanel">
+  <h2>Animal Friends</h2>
+  <div class="row">
+    <label>How many <span class="val" id="aCountVal"></span></label>
+    <input type="range" id="aCount" min="1" max="4" value="3" />
+    <div class="hint">A few big friends to tap.</div>
+  </div>
+  <div class="row">
+    <label>Animal set</label>
+    <div class="seg" id="aSetSeg">
+      <button type="button" data-mode="farm" class="active">Farm</button>
+      <button type="button" data-mode="pond">Pond</button>
+      <button type="button" data-mode="pets">Pets</button>
+    </div>
+    <div class="hint">Farm, pond, or pets.</div>
+  </div>
+  <div class="row">
+    <label>Sounds</label>
+    <div class="seg" id="aSoundSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">A soft sound when you tap an animal.</div>
+  </div>
+  <div class="row">
+    <label>Say the name</label>
+    <div class="seg" id="aNameSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">Speaks the name and the sound, like "Cow. Moo."</div>
+  </div>
+  <div class="row">
+    <label>Wander speed <span class="val" id="aSpeedVal"></span></label>
+    <input type="range" id="aSpeed" min="0" max="100" value="40" />
+    <div class="hint">Low = barely drift. High = roam more.</div>
+  </div>
+</div>
+
+<div id="pianoPanel">
+  <h2>Color Piano</h2>
+  <div class="row">
+    <label>Keys</label>
+    <div class="seg" id="pKeysSeg">
+      <button type="button" data-mode="3">3</button>
+      <button type="button" data-mode="5" class="active">5</button>
+      <button type="button" data-mode="7">7</button>
+    </div>
+    <div class="hint">How many colored bars.</div>
+  </div>
+  <div class="row">
+    <label>Sound</label>
+    <div class="seg" id="pSustainSeg">
+      <button type="button" data-mode="pluck" class="active">Pluck</button>
+      <button type="button" data-mode="pad">Soft pad</button>
+    </div>
+    <div class="hint">Pluck: short note. Soft pad: holds while pressed.</div>
+  </div>
+  <div class="row">
+    <label>Say the color</label>
+    <div class="seg" id="pColorSeg">
+      <button type="button" data-mode="on">On</button>
+      <button type="button" data-mode="off" class="active">Off</button>
+    </div>
+    <div class="hint">Speaks the color name on each press.</div>
+  </div>
+  <div class="row">
+    <label>Bloom <span class="val" id="pBloomVal"></span></label>
+    <input type="range" id="pBloom" min="0" max="100" value="70" />
+    <div class="hint">The soft color puff that rises off a key.</div>
+  </div>
+</div>
+
+<div id="dayPanel">
+  <h2>Day &amp; Night</h2>
+  <div class="row">
+    <label>Change speed <span class="val" id="dSpeedVal"></span></label>
+    <input type="range" id="dSpeed" min="0" max="100" value="45" />
+    <div class="hint">Low = instant flip. High = slow, dreamy fade.</div>
+  </div>
+  <div class="row">
+    <label>Say day/night</label>
+    <div class="seg" id="dLabelSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">Speaks "Day" or "Night" on each tap.</div>
+  </div>
+  <div class="row">
+    <label>Little friend</label>
+    <div class="seg" id="dCritterSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">An owl at night, a rooster by day.</div>
+  </div>
+  <div class="row">
+    <label>Clouds</label>
+    <div class="seg" id="dMotionSeg">
+      <button type="button" data-mode="drift" class="active">Drift</button>
+      <button type="button" data-mode="still">Still</button>
+    </div>
+    <div class="hint">Drift: clouds move slowly. Still: no movement.</div>
+  </div>
+</div>
+
+<div id="starPanel">
+  <h2>Stardust Trail</h2>
+  <div class="row">
+    <label>Trail color</label>
+    <div class="seg" id="sThemeSeg">
+      <button type="button" data-mode="gold" class="active">Gold</button>
+      <button type="button" data-mode="rainbow">Rainbow</button>
+      <button type="button" data-mode="ocean">Ocean</button>
+    </div>
+    <div class="hint">The color of the glowing trail.</div>
+  </div>
+  <div class="row">
+    <label>Fade speed <span class="val" id="sFadeVal"></span></label>
+    <input type="range" id="sFade" min="0" max="100" value="45" />
+    <div class="hint">Low = trail lingers. High = fades fast.</div>
+  </div>
+  <div class="row">
+    <label>Sounds</label>
+    <div class="seg" id="sSoundSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">A soft shimmer as you draw.</div>
+  </div>
+  <div class="row">
+    <label>Guides</label>
+    <div class="seg" id="sGuideSeg">
+      <button type="button" data-mode="none" class="active">None</button>
+      <button type="button" data-mode="shapes">Shapes</button>
+      <button type="button" data-mode="letters">Letters</button>
+    </div>
+    <div class="hint">Trace dotted shapes or first letters to complete them.</div>
+  </div>
+  <div class="row">
+    <label>Sparkle <span class="val" id="sSparkVal"></span></label>
+    <input type="range" id="sSpark" min="0" max="100" value="70" />
+    <div class="hint">How big the finishing sparkle is.</div>
+  </div>
+</div>
+
+<div id="feelPanel">
+  <h2>How Do You Feel</h2>
+  <div class="row">
+    <label>Order</label>
+    <div class="seg" id="fOrderSeg">
+      <button type="button" data-mode="random" class="active">Random</button>
+      <button type="button" data-mode="fixed">In order</button>
+    </div>
+    <div class="hint">Pick the next feeling randomly or in order.</div>
+  </div>
+  <div class="row">
+    <label>Say the feeling</label>
+    <div class="seg" id="fLabelSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">Speaks "Happy", "Sad", "Sleepy", "Surprised".</div>
+  </div>
+  <div class="row">
+    <label>Morph speed <span class="val" id="fSpeedVal"></span></label>
+    <input type="range" id="fSpeed" min="0" max="100" value="40" />
+    <div class="hint">Low = slow, gentle change. High = quicker.</div>
   </div>
 </div>
 
@@ -595,6 +775,70 @@
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === "suspended") actx.resume();
     } catch (e) { /* no audio is fine */ }
+  }
+
+  // ---- Shared audio + speech (used by the newer modes) ----
+  // Same gentle pentatonic as Calm so any mashing stays pleasant.
+  var PENTA = [523.25, 587.33, 659.25, 783.99, 880.0];                 // C5 D5 E5 G5 A5
+  var PENTA7 = [392.0, 440.0, 493.88, 587.33, 659.25, 783.99, 880.0];  // G4 A4 B4 D5 E5 G5 A5
+
+  // One soft note. Returns a live voice {o,g} when held=true (caller must stop it).
+  function tone(freq, dur, type, peak, held) {
+    if (!actx) return null;
+    var t = actx.currentTime;
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak || 0.12, t + 0.02);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t);
+    if (held) return { o: o, g: g };
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.6));
+    o.stop(t + (dur || 0.6) + 0.05);
+    return null;
+  }
+  function stopVoice(v) {
+    if (!v || !actx) return;
+    try {
+      var t = actx.currentTime;
+      v.g.gain.cancelScheduledValues(t);
+      v.g.gain.setValueAtTime(v.g.gain.value, t);
+      v.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      v.o.stop(t + 0.22);
+    } catch (e) { /* ignore */ }
+  }
+
+  // SpeechSynthesis: pin one voice, speak only after a user gesture.
+  var userGestured = false;
+  var sVoice = null;
+  function rankVoice(v) {
+    var n = (v.name || "").toLowerCase(), s = 0;
+    if (/samantha|google us english|google uk english female|karen|moira|tessa|female/.test(n)) s += 3;
+    if (/en[-_]us/i.test(v.lang)) s += 1;
+    return s;
+  }
+  function pinVoice() {
+    if (!("speechSynthesis" in window)) return;
+    var vs = window.speechSynthesis.getVoices();
+    if (!vs || !vs.length) return;
+    var en = vs.filter(function (v) { return /^en/i.test(v.lang); });
+    en.sort(function (a, b) { return rankVoice(b) - rankVoice(a); });
+    sVoice = en[0] || vs[0];
+  }
+  if ("speechSynthesis" in window) {
+    try { window.speechSynthesis.onvoiceschanged = pinVoice; } catch (e) { /* ignore */ }
+    pinVoice();
+  }
+  function speak(text, on) {
+    if (!on || !userGestured || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      if (sVoice) u.voice = sVoice;
+      u.rate = 0.9; u.pitch = 1.12; u.volume = 1;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
   }
 
   // Two quick rising-then-settling notes = a cute tweet. Pitch varies by bird.
@@ -1013,19 +1257,469 @@
   }
   // =================== END CALM =====================
 
-  function loop() {
-    if (screen === "birds") {
-      drawSky();
-      updateAndDrawBirds();
-      requestAnimationFrame(loop);
-      return;
-    }
-    if (screen === "calm") {
-      drawCalmScene();
-      requestAnimationFrame(loop);
-      return;
-    }
+  // Small shared drawing/color helpers for the new modes
+  function hexToRgb(h) { h = h.replace("#", ""); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
+  function shade(h, f) { var c = hexToRgb(h); return "rgb(" + c.map(function (v) { return Math.max(0, Math.min(255, Math.round(v * f))); }).join(",") + ")"; }
+  function lerpColor(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+  function rgbStr(c) { return "rgb(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + ")"; }
+  function roundRectFill(x, y, w, hh, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + hh, r); ctx.arcTo(x + w, y + hh, x, y + hh, r);
+    ctx.arcTo(x, y + hh, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); ctx.fill();
+  }
+  var isPhone = Math.min(window.innerWidth, window.innerHeight) < 500;
 
+  // cached sliders read inside draw loops
+  var aCountEl = document.getElementById("aCount");
+  var aSpeedEl = document.getElementById("aSpeed");
+  var pBloomEl = document.getElementById("pBloom");
+  var dSpeedEl = document.getElementById("dSpeed");
+  var sFadeEl = document.getElementById("sFade");
+  var sSparkEl = document.getElementById("sSpark");
+  var fSpeedEl = document.getElementById("fSpeed");
+
+  // ===================== ANIMAL FRIENDS ======================
+  var ANIMAL_SETS = {
+    farm: [
+      { name: "Cow", word: "Moo", body: "#f2efe9", accent: "#3a3a3a", ear: "round", feat: "spots", snd: "cow" },
+      { name: "Pig", word: "Oink", body: "#f7b8c8", accent: "#e98aa0", ear: "round", feat: "snout", snd: "pig" },
+      { name: "Sheep", word: "Baa", body: "#f6f6f6", accent: "#d8d8d8", ear: "floppy", feat: "wool", snd: "sheep" },
+      { name: "Hen", word: "Cluck", body: "#f6d365", accent: "#ff9f1c", ear: "none", feat: "beak", snd: "hen" }
+    ],
+    pond: [
+      { name: "Duck", word: "Quack", body: "#ffe08a", accent: "#ff9f1c", ear: "none", feat: "beak", snd: "duck" },
+      { name: "Frog", word: "Ribbit", body: "#8fd96b", accent: "#5fae3d", ear: "eyes", feat: "none", snd: "frog" },
+      { name: "Fish", word: "Blub", body: "#7fd8ff", accent: "#4aa3ff", ear: "fin", feat: "none", snd: "fish" },
+      { name: "Turtle", word: "", body: "#86c98e", accent: "#5a9e63", ear: "shell", feat: "none", snd: "turtle" }
+    ],
+    pets: [
+      { name: "Dog", word: "Woof", body: "#e0b07a", accent: "#a9774a", ear: "floppy", feat: "snout", snd: "dog" },
+      { name: "Cat", word: "Meow", body: "#f6b36b", accent: "#d98a3a", ear: "pointy", feat: "whisk", snd: "cat" },
+      { name: "Bunny", word: "Hop", body: "#f3eae2", accent: "#d8c5b6", ear: "tall", feat: "none", snd: "bunny" },
+      { name: "Bird", word: "Tweet", body: "#7fd8ff", accent: "#ff9f1c", ear: "none", feat: "beak", snd: "bird" }
+    ]
+  };
+  var animals = [];
+  var animalSet = "farm";
+  var animalSounds = true;
+  var animalNames = true;
+
+  function animalBounds() { return { top: H * 0.2, bot: H * 0.74, left: W * 0.13, right: W * 0.87 }; }
+  function initAnimals() {
+    animals = [];
+    var set = ANIMAL_SETS[animalSet];
+    var n = Math.max(1, Math.min(4, parseInt(aCountEl.value, 10)));
+    var b = animalBounds();
+    for (var i = 0; i < n; i++) {
+      var k = set[i % set.length];
+      var x = b.left + (i + 0.5) / n * (b.right - b.left);
+      var y = b.top + Math.random() * (b.bot - b.top);
+      animals.push({ x: x, y: y, tx: x, ty: y, vx: 0, vy: 0, kind: k, react: 0, dir: 1, bob: Math.random() * 6.28, pause: 0 });
+    }
+  }
+
+  function aGlide(f1, f2, dur, type, peak) {
+    if (!actx) return; var t = actx.currentTime; var o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(40, f2), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak || 0.12, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function aPulses(freq, n, type, peak, gap) {
+    if (!actx) return; var t = actx.currentTime;
+    for (var i = 0; i < n; i++) {
+      var st = t + i * (gap || 0.16); var o = actx.createOscillator(), g = actx.createGain();
+      o.type = type || "square"; o.frequency.setValueAtTime(freq, st);
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(peak || 0.12, st + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.1);
+      o.connect(g); g.connect(actx.destination); o.start(st); o.stop(st + 0.12);
+    }
+  }
+  function aVibrato(freq, dur) {
+    if (!actx) return; var t = actx.currentTime;
+    var o = actx.createOscillator(), g = actx.createGain(), lfo = actx.createOscillator(), lg = actx.createGain();
+    o.type = "sawtooth"; o.frequency.value = freq; lfo.frequency.value = 11; lg.gain.value = 14; lfo.connect(lg); lg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination); o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  }
+  function animalSound(snd) {
+    if (!animalSounds) return; ensureAudio();
+    switch (snd) {
+      case "cow": aGlide(210, 150, 0.5, "sawtooth", 0.13); break;
+      case "pig": aPulses(150, 3, "square", 0.1, 0.12); break;
+      case "sheep": aVibrato(330, 0.5); break;
+      case "hen": aPulses(560, 3, "square", 0.1, 0.1); break;
+      case "duck": aPulses(420, 3, "sawtooth", 0.1, 0.1); break;
+      case "frog": aPulses(120, 2, "square", 0.12, 0.16); break;
+      case "fish": tone(720, 0.12, "sine", 0.08); break;
+      case "turtle": tone(160, 0.3, "sine", 0.08); break;
+      case "dog": aPulses(180, 2, "square", 0.14, 0.18); break;
+      case "cat": aGlide(520, 780, 0.4, "sine", 0.12); break;
+      case "bunny": aPulses(680, 2, "sine", 0.1, 0.1); break;
+      case "bird": aGlide(800, 1200, 0.18, "triangle", 0.1); break;
+      default: tone(440, 0.2); break;
+    }
+  }
+
+  function drawEars(k, R) {
+    ctx.fillStyle = k.body;
+    switch (k.ear) {
+      case "round":
+        ctx.beginPath(); ctx.arc(-R * 0.5, -R * 0.85, R * 0.26, 0, 6.29); ctx.arc(R * 0.5, -R * 0.85, R * 0.26, 0, 6.29); ctx.fill(); break;
+      case "floppy":
+        ctx.beginPath(); ctx.ellipse(-R * 0.6, -R * 0.55, R * 0.2, R * 0.34, 0.4, 0, 6.29); ctx.ellipse(R * 0.6, -R * 0.55, R * 0.2, R * 0.34, -0.4, 0, 6.29); ctx.fill(); break;
+      case "pointy":
+        ctx.beginPath(); ctx.moveTo(-R * 0.62, -R * 0.5); ctx.lineTo(-R * 0.4, -R * 1.05); ctx.lineTo(-R * 0.18, -R * 0.62); ctx.closePath();
+        ctx.moveTo(R * 0.62, -R * 0.5); ctx.lineTo(R * 0.4, -R * 1.05); ctx.lineTo(R * 0.18, -R * 0.62); ctx.closePath(); ctx.fill(); break;
+      case "tall":
+        ctx.beginPath(); ctx.ellipse(-R * 0.28, -R * 1.05, R * 0.14, R * 0.42, 0.05, 0, 6.29); ctx.ellipse(R * 0.28, -R * 1.05, R * 0.14, R * 0.42, -0.05, 0, 6.29); ctx.fill(); break;
+      case "eyes":
+        ctx.beginPath(); ctx.arc(-R * 0.32, -R * 0.92, R * 0.22, 0, 6.29); ctx.arc(R * 0.32, -R * 0.92, R * 0.22, 0, 6.29); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-R * 0.32, -R * 0.94, R * 0.1, 0, 6.29); ctx.arc(R * 0.32, -R * 0.94, R * 0.1, 0, 6.29); ctx.fill();
+        ctx.fillStyle = "#2a2a2a"; ctx.beginPath(); ctx.arc(-R * 0.32, -R * 0.94, R * 0.05, 0, 6.29); ctx.arc(R * 0.32, -R * 0.94, R * 0.05, 0, 6.29); ctx.fill(); break;
+      case "fin":
+        ctx.fillStyle = k.accent; ctx.beginPath(); ctx.moveTo(-R * 0.1, -R * 0.95); ctx.lineTo(R * 0.22, -R * 1.2); ctx.lineTo(R * 0.32, -R * 0.78); ctx.closePath(); ctx.fill(); break;
+      default: break;
+    }
+  }
+  function drawFeature(k, R) {
+    switch (k.feat) {
+      case "snout":
+        ctx.fillStyle = k.accent; ctx.beginPath(); ctx.ellipse(0, -R * 0.18, R * 0.26, R * 0.18, 0, 0, 6.29); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.arc(-R * 0.1, -R * 0.18, R * 0.04, 0, 6.29); ctx.arc(R * 0.1, -R * 0.18, R * 0.04, 0, 6.29); ctx.fill(); break;
+      case "beak":
+        ctx.fillStyle = k.accent; ctx.beginPath(); ctx.moveTo(-R * 0.14, -R * 0.26); ctx.lineTo(R * 0.14, -R * 0.26); ctx.lineTo(0, -R * 0.06); ctx.closePath(); ctx.fill(); break;
+      case "spots":
+        ctx.fillStyle = k.accent; ctx.beginPath(); ctx.ellipse(-R * 0.45, R * 0.35, R * 0.22, R * 0.16, 0.3, 0, 6.29); ctx.ellipse(R * 0.42, R * 0.55, R * 0.18, R * 0.13, -0.2, 0, 6.29); ctx.fill(); break;
+      case "wool":
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        for (var i = 0; i < 8; i++) { var an = i / 8 * 6.28; ctx.beginPath(); ctx.arc(Math.cos(an) * R * 0.78, R * 0.25 + Math.sin(an) * R * 0.62, R * 0.2, 0, 6.29); ctx.fill(); } break;
+      case "whisk":
+        ctx.strokeStyle = "rgba(80,80,80,0.5)"; ctx.lineWidth = R * 0.02;
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.1, -R * 0.2); ctx.lineTo(-R * 0.52, -R * 0.28); ctx.moveTo(-R * 0.1, -R * 0.15); ctx.lineTo(-R * 0.52, -R * 0.14);
+        ctx.moveTo(R * 0.1, -R * 0.2); ctx.lineTo(R * 0.52, -R * 0.28); ctx.moveTo(R * 0.1, -R * 0.15); ctx.lineTo(R * 0.52, -R * 0.14); ctx.stroke();
+        ctx.fillStyle = "#d98a3a"; ctx.beginPath(); ctx.arc(0, -R * 0.2, R * 0.05, 0, 6.29); ctx.fill(); break;
+      default: break;
+    }
+  }
+  function drawAnimal(a) {
+    var k = a.kind, R = Math.min(W, H) * 0.13;
+    ctx.save();
+    ctx.translate(a.x, a.y + Math.sin(a.bob) * 3);
+    ctx.rotate(Math.sin(a.bob) * 0.03 + a.react * 0.18 * Math.sin(a.bob * 4));
+    ctx.scale(a.dir * (1 + a.react * 0.07), 1 + a.react * 0.07);
+    if (k.feat === "wool") drawFeature(k, R);          // wool sits behind the body
+    drawEars(k, R);
+    ctx.fillStyle = k.body;
+    ctx.beginPath(); ctx.ellipse(0, R * 0.3, R * 0.92, R * 0.78, 0, 0, 6.29); ctx.fill();   // body
+    ctx.beginPath(); ctx.arc(0, -R * 0.35, R * 0.7, 0, 6.29); ctx.fill();                    // head
+    if (k.feat !== "wool") drawFeature(k, R);
+    ctx.fillStyle = "rgba(255,150,150,0.35)";
+    ctx.beginPath(); ctx.arc(-R * 0.4, -R * 0.22, R * 0.13, 0, 6.29); ctx.arc(R * 0.4, -R * 0.22, R * 0.13, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "#2a2a2a";
+    ctx.beginPath(); ctx.arc(-R * 0.24, -R * 0.42, R * 0.08, 0, 6.29); ctx.arc(R * 0.24, -R * 0.42, R * 0.08, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath(); ctx.arc(-R * 0.21, -R * 0.45, R * 0.03, 0, 6.29); ctx.arc(R * 0.27, -R * 0.45, R * 0.03, 0, 6.29); ctx.fill();
+    ctx.strokeStyle = "#5a4030"; ctx.lineWidth = R * 0.045; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(0, -R * 0.22, R * 0.18, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function drawAnimalsFrame() {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#bfe9ff"); g.addColorStop(0.55, "#d8f3c8"); g.addColorStop(1, "#a6e08a");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var sp = parseInt(aSpeedEl.value, 10) / 100;
+    var b = animalBounds();
+    for (var i = 0; i < animals.length; i++) {
+      var a = animals[i];
+      var dx = a.tx - a.x, dy = a.ty - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var acc = 0.03 + sp * 0.16;
+      a.vx += dx / d * acc; a.vy += dy / d * acc;
+      var s = Math.sqrt(a.vx * a.vx + a.vy * a.vy), mx = 0.3 + sp * 2.2;
+      if (s > mx) { a.vx *= mx / s; a.vy *= mx / s; }
+      a.vx *= 0.9; a.vy *= 0.9; a.bob += 0.05;
+      a.x += a.vx; a.y += a.vy;
+      if (Math.abs(a.vx) > 0.2) a.dir = a.vx > 0 ? 1 : -1;
+      if (d < 26) { a.pause++; if (a.pause > 40 + Math.random() * 140) { a.tx = b.left + Math.random() * (b.right - b.left); a.ty = b.top + Math.random() * (b.bot - b.top); a.pause = 0; } }
+      a.react = a.react > 0.001 ? a.react * 0.9 : 0;
+      drawAnimal(a);
+    }
+  }
+  function animalDown(x, y) {
+    var R = Math.min(W, H) * 0.13;
+    for (var i = animals.length - 1; i >= 0; i--) {
+      var a = animals[i], dx = x - a.x, dy = y - a.y, rr = R * 1.3;
+      if (dx * dx + dy * dy <= rr * rr) {
+        a.react = 1; a.vy -= 1.5;
+        animalSound(a.kind.snd);
+        speak(a.kind.name + (a.kind.word ? ". " + a.kind.word + "." : "."), animalNames);
+        return;
+      }
+    }
+  }
+  // =================== END ANIMAL FRIENDS ====================
+
+  // ===================== COLOR PIANO ======================
+  var KEY_COLORS = [
+    { c: "#ff6b6b", name: "Red" }, { c: "#ff9f43", name: "Orange" }, { c: "#feca57", name: "Yellow" },
+    { c: "#1dd1a1", name: "Green" }, { c: "#54a0ff", name: "Blue" }, { c: "#5f27cd", name: "Purple" }, { c: "#ff9ff3", name: "Pink" }
+  ];
+  var pianoKeys = 5;
+  var pianoPad = false;
+  var pianoColorNames = false;
+  var pianoVoices = {};   // pointerId -> { voice, idx }
+  var pianoBlooms = [];
+
+  function pickByIndex(arr, n) {
+    var out = [];
+    for (var i = 0; i < n; i++) { out.push(arr[Math.round(i * (arr.length - 1) / Math.max(1, n - 1))]); }
+    return out;
+  }
+  function pianoLayout() {
+    var n = pianoKeys;
+    return { n: n, colors: pickByIndex(KEY_COLORS, n), notes: pickByIndex(n > 5 ? PENTA7 : PENTA, n) };
+  }
+  function pianoPressed(i) { for (var k in pianoVoices) { if (pianoVoices[k].idx === i) return true; } return false; }
+  function drawPianoFrame() {
+    var lay = pianoLayout(), n = lay.n, bw = W / n;
+    ctx.fillStyle = "#1c2233"; ctx.fillRect(0, 0, W, H);
+    for (var i = 0; i < n; i++) {
+      var x = i * bw, col = lay.colors[i].c;
+      var g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, shade(col, 1.12)); g.addColorStop(1, shade(col, 0.82));
+      ctx.fillStyle = g; roundRectFill(x + 4, 8, bw - 8, H - 16, 18);
+      if (pianoPressed(i)) { ctx.fillStyle = "rgba(255,255,255,0.2)"; roundRectFill(x + 4, 8, bw - 8, H - 16, 18); }
+    }
+    for (var b = pianoBlooms.length - 1; b >= 0; b--) {
+      var p = pianoBlooms[b]; p.life += 0.016; p.y -= 0.7; p.r += 1.5;
+      var a = Math.max(0, 1 - p.life / 1.6);
+      if (p.life > 1.6) { pianoBlooms.splice(b, 1); continue; }
+      ctx.fillStyle = "rgba(" + p.rgb + "," + (0.5 * a * p.intensity) + ")";
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.29); ctx.fill();
+    }
+  }
+  function pianoDown(x, y, e) {
+    var lay = pianoLayout(), n = lay.n, bw = W / n;
+    var i = Math.max(0, Math.min(n - 1, Math.floor(x / bw)));
+    ensureAudio();
+    var col = lay.colors[i], note = lay.notes[i];
+    var inten = parseInt(pBloomEl.value, 10) / 100;
+    if (inten > 0) {
+      pianoBlooms.push({ x: i * bw + bw / 2, y: H * 0.82, r: bw * 0.18, life: 0, rgb: hexToRgb(col.c).join(","), intensity: inten });
+      if (pianoBlooms.length > 40) pianoBlooms.splice(0, pianoBlooms.length - 40);
+    }
+    var id = (e && e.pointerId != null) ? e.pointerId : "m";
+    if (pianoPad) { pianoVoices[id] = { voice: tone(note, 0, "sine", 0.12, true), idx: i }; }
+    else { tone(note, 0.5, "triangle", 0.14); pianoVoices[id] = { voice: null, idx: i }; }
+    speak(col.name, pianoColorNames);
+  }
+  function pianoUp(e) {
+    var id = (e && e.pointerId != null) ? e.pointerId : "m";
+    var rec = pianoVoices[id];
+    if (rec) { if (rec.voice) stopVoice(rec.voice); delete pianoVoices[id]; }
+  }
+  function pianoTeardown() { for (var k in pianoVoices) { if (pianoVoices[k].voice) stopVoice(pianoVoices[k].voice); } pianoVoices = {}; pianoBlooms.length = 0; }
+  // =================== END COLOR PIANO ====================
+
+  // ===================== DAY & NIGHT ======================
+  var dayNight = 0;     // 0 = day, 1 = night
+  var dayTarget = 0;
+  var dayReact = 0;
+  var dayStars = [];
+  var dayLabels = true;
+  var dayCritter = true;
+  var dayClouds = true;
+  function initDayNight() {
+    dayNight = 0; dayTarget = 0;
+    dayStars = [];
+    for (var i = 0; i < 9; i++) dayStars.push({ x: Math.random() * W, y: 30 + Math.random() * H * 0.45, r: 1.4 + Math.random() * 2, ph: Math.random() * 6.28 });
+    if (clouds.length === 0) initClouds();
+  }
+  function dayDown() {
+    dayTarget = dayTarget < 0.5 ? 1 : 0; dayReact = 1;
+    speak(dayTarget > 0.5 ? "Night" : "Day", dayLabels);
+  }
+  function drawDayNightFrame() {
+    var spd = parseInt(dSpeedEl.value, 10) / 100;
+    var rate = spd <= 0 ? 1 : 0.012 + (1 - spd) * 0.12;
+    dayNight += (dayTarget - dayNight) * rate;
+    dayReact = dayReact > 0.001 ? dayReact * 0.92 : 0;
+    var t = dayNight;
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, rgbStr(lerpColor([135, 206, 250], [18, 22, 48], t)));
+    g.addColorStop(1, rgbStr(lerpColor([224, 247, 255], [44, 46, 86], t)));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (t > 0.05) for (var i = 0; i < dayStars.length; i++) {
+      var s = dayStars[i], a = (0.3 + 0.4 * (0.5 + 0.5 * Math.sin(dayNight * 6 + s.ph))) * t;
+      ctx.fillStyle = "rgba(255,255,255," + a + ")"; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.29); ctx.fill();
+    }
+    var sunY = H * 0.2 + t * H * 0.95, moonY = H * 1.15 - t * H * 0.95;
+    ctx.globalAlpha = Math.max(0, 1 - t * 1.4);
+    var sr = Math.min(W, H) * 0.08;
+    ctx.fillStyle = "#fff3b0"; ctx.beginPath(); ctx.arc(W * 0.78, sunY, sr, 0, 6.29); ctx.fill();
+    ctx.globalAlpha = Math.max(0, (t - 0.2) * 1.4);
+    ctx.fillStyle = "#fffaf0"; ctx.beginPath(); ctx.arc(W * 0.24, moonY, sr * 0.9, 0, 6.29); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (dayClouds) for (var c = 0; c < clouds.length; c++) { var cl = clouds[c]; cl.x += cl.spd; if (cl.x - 90 * cl.s > W) cl.x = -90 * cl.s; drawCloud(cl.x, cl.y, cl.s); }
+    var gy = H * 0.84;
+    ctx.fillStyle = rgbStr(lerpColor([143, 217, 107], [40, 70, 45], t));
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.quadraticCurveTo(W * 0.3, gy - 18, W * 0.6, gy); ctx.quadraticCurveTo(W * 0.85, gy + 18, W, gy - 6); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+    if (dayCritter) drawCritter(t, dayReact, gy);
+  }
+  function drawCritter(t, react, gy) {
+    var R = Math.min(W, H) * 0.07, cx = W * 0.5, cy = gy - R * 0.4 - react * 8;
+    // rooster by day
+    ctx.globalAlpha = Math.max(0, 1 - t * 1.4);
+    ctx.fillStyle = "#d96a4a";
+    ctx.beginPath(); ctx.ellipse(cx, cy, R * 0.8, R, 0, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "#e85f5f"; ctx.beginPath(); ctx.arc(cx, cy - R * 0.9, R * 0.16, 0, 6.29); ctx.arc(cx - R * 0.18, cy - R, R * 0.13, 0, 6.29); ctx.arc(cx + R * 0.18, cy - R, R * 0.13, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "#ff9f1c"; ctx.beginPath(); ctx.moveTo(cx + R * 0.7, cy - R * 0.5); ctx.lineTo(cx + R * 1.1, cy - R * 0.4); ctx.lineTo(cx + R * 0.7, cy - R * 0.25); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#2a2a2a"; ctx.beginPath(); ctx.arc(cx + R * 0.35, cy - R * 0.5, R * 0.08, 0, 6.29); ctx.fill();
+    // owl by night
+    ctx.globalAlpha = Math.max(0, (t - 0.2) * 1.4);
+    ctx.fillStyle = "#8a6f5a"; ctx.beginPath(); ctx.ellipse(cx, cy, R * 0.85, R, 0, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "#efe7d8"; ctx.beginPath(); ctx.arc(cx - R * 0.35, cy - R * 0.2, R * 0.34, 0, 6.29); ctx.arc(cx + R * 0.35, cy - R * 0.2, R * 0.34, 0, 6.29); ctx.fill();
+    var eo = 0.5 + 0.5 * t;  // eyes open more at night
+    ctx.fillStyle = "#2a2a2a"; ctx.beginPath(); ctx.arc(cx - R * 0.35, cy - R * 0.2, R * 0.16 * eo, 0, 6.29); ctx.arc(cx + R * 0.35, cy - R * 0.2, R * 0.16 * eo, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "#ff9f1c"; ctx.beginPath(); ctx.moveTo(cx, cy - R * 0.05); ctx.lineTo(cx - R * 0.1, cy + R * 0.12); ctx.lineTo(cx + R * 0.1, cy + R * 0.12); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // =================== END DAY & NIGHT ====================
+
+  // ===================== STARDUST TRAIL ======================
+  var trail = [];
+  var starTheme = "gold";
+  var starSounds = true;
+  var starGuides = "none";
+  var starGuide = null;
+  var starGuideIdx = 0;
+  var starSparkles = [];
+  var lastShimmer = 0;
+  var RAINBOW = ["255,107,107", "255,159,67", "254,202,87", "29,209,161", "84,160,255", "95,39,205", "255,159,243"];
+  var SHAPES = ["circle", "line", "triangle"];
+  var LETTERS = ["I", "L", "O", "T", "C", "V"];
+
+  function themeRGB(i) {
+    if (starTheme === "rainbow") return RAINBOW[i % RAINBOW.length];
+    if (starTheme === "ocean") return "120,200,255";
+    return "255,210,120";
+  }
+  function gp(x, y) { return { x: x, y: y, hit: false }; }
+  function buildGuidePoints(kind) {
+    var cx = W * 0.5, cy = H * 0.5, s = Math.min(W, H) * 0.22, pts = [], i, n;
+    if (kind === "circle" || kind === "O") { n = 22; for (i = 0; i < n; i++) { var an = i / n * 6.28; pts.push(gp(cx + Math.cos(an) * s, cy + Math.sin(an) * s)); } return { name: "Circle", points: pts }; }
+    if (kind === "line") { n = 16; for (i = 0; i < n; i++) pts.push(gp(cx - s + (2 * s) * i / (n - 1), cy)); return { name: "Line", points: pts }; }
+    if (kind === "triangle") { var v = [[cx, cy - s], [cx - s, cy + s], [cx + s, cy + s]]; for (var e = 0; e < 3; e++) { var p0 = v[e], p1 = v[(e + 1) % 3]; for (i = 0; i < 8; i++) pts.push(gp(p0[0] + (p1[0] - p0[0]) * i / 8, p0[1] + (p1[1] - p0[1]) * i / 8)); } return { name: "Triangle", points: pts }; }
+    if (kind === "I") { n = 14; for (i = 0; i < n; i++) pts.push(gp(cx, cy - s + 2 * s * i / (n - 1))); return { name: "I", points: pts }; }
+    if (kind === "L") { for (i = 0; i < 10; i++) pts.push(gp(cx - s * 0.5, cy - s + 2 * s * i / 9)); for (i = 0; i < 8; i++) pts.push(gp(cx - s * 0.5 + 1.4 * s * i / 7, cy + s)); return { name: "L", points: pts }; }
+    if (kind === "T") { for (i = 0; i < 12; i++) pts.push(gp(cx - s + 2 * s * i / 11, cy - s)); for (i = 0; i < 10; i++) pts.push(gp(cx, cy - s + 2 * s * i / 9)); return { name: "T", points: pts }; }
+    if (kind === "C") { n = 16; for (i = 0; i < n; i++) { var a2 = 0.35 * Math.PI + (1.3 * Math.PI) * i / (n - 1); pts.push(gp(cx + Math.cos(a2) * s, cy + Math.sin(a2) * s)); } return { name: "C", points: pts }; }
+    if (kind === "V") { for (i = 0; i < 9; i++) pts.push(gp(cx - s + s * i / 8, cy - s + 2 * s * i / 8)); for (i = 0; i < 9; i++) pts.push(gp(cx + s * i / 8, cy + s - 2 * s * i / 8)); return { name: "V", points: pts }; }
+    return { name: "Circle", points: pts };
+  }
+  function nextGuide() {
+    if (starGuides === "shapes") { starGuide = buildGuidePoints(SHAPES[starGuideIdx % SHAPES.length]); starGuideIdx++; }
+    else if (starGuides === "letters") { starGuide = buildGuidePoints(LETTERS[starGuideIdx % LETTERS.length]); starGuideIdx++; }
+    else starGuide = null;
+  }
+  function initStar() { trail = []; starSparkles = []; starGuideIdx = 0; nextGuide(); }
+  function trailShimmer(sp) {
+    if (!starSounds) return;
+    var now = performance.now(); if (now - lastShimmer < 70) return; lastShimmer = now;
+    tone(PENTA7[(Math.random() * PENTA7.length) | 0] * 2, 0.18, "sine", Math.min(0.1, 0.02 + sp * 0.004));
+  }
+  function guideProgress(x, y) {
+    if (!starGuide) return;
+    var pts = starGuide.points, hits = 0, total = pts.length;
+    for (var i = 0; i < total; i++) { if (!pts[i].hit) { var dx = x - pts[i].x, dy = y - pts[i].y; if (dx * dx + dy * dy < 30 * 30) pts[i].hit = true; } if (pts[i].hit) hits++; }
+    if (hits / total >= 0.8) { sparkleBurst(W * 0.5, H * 0.5); speak(starGuide.name, starSounds); starGuide = null; nextGuide(); }
+  }
+  function sparkleBurst(x, y) {
+    var inten = parseInt(sSparkEl.value, 10) / 100; if (inten <= 0) return;
+    var n = 10 + Math.round(inten * 14);
+    for (var i = 0; i < n; i++) { var an = Math.random() * 6.28, sp = (1 + Math.random() * 3) * (0.5 + inten); starSparkles.push({ x: x, y: y, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, life: 0 }); }
+  }
+  function addTrail(x, y) {
+    var last = trail[trail.length - 1];
+    if (last) { var dx = x - last.x, dy = y - last.y, d = Math.sqrt(dx * dx + dy * dy); if (d < 6) return; trailShimmer(d); }
+    trail.push({ x: x, y: y, life: 0 });
+    var cap = isPhone ? 80 : 160; if (trail.length > cap) trail.splice(0, trail.length - cap);
+    guideProgress(x, y);
+  }
+  function starDown(x, y) { ensureAudio(); addTrail(x, y); }
+  function starMove(x, y) { addTrail(x, y); }
+  function starTeardown() { trail = []; starSparkles = []; }
+  function drawGuide() {
+    if (!starGuide) return;
+    var pts = starGuide.points;
+    for (var i = 0; i < pts.length; i++) {
+      ctx.fillStyle = pts[i].hit ? "rgba(255,240,180,0.9)" : "rgba(255,255,255,0.28)";
+      ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, pts[i].hit ? 4 : 3, 0, 6.29); ctx.fill();
+    }
+  }
+  function drawStarFrame() {
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#10142b"); g.addColorStop(1, "#1b2350");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (starGuides !== "none") drawGuide();
+    var fade = 0.004 + (parseInt(sFadeEl.value, 10) / 100) * 0.03;
+    for (var i = trail.length - 1; i >= 0; i--) {
+      var p = trail[i]; p.life += fade; if (p.life >= 1) { trail.splice(i, 1); continue; }
+      var a = 1 - p.life, col = themeRGB(i), r = 12 * a + 5;
+      var rg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2);
+      rg.addColorStop(0, "rgba(" + col + "," + (0.55 * a) + ")"); rg.addColorStop(1, "rgba(" + col + ",0)");
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2, 0, 6.29); ctx.fill();
+    }
+    for (var s = starSparkles.length - 1; s >= 0; s--) {
+      var sp = starSparkles[s]; sp.life += 0.03; sp.x += sp.vx; sp.y += sp.vy; sp.vx *= 0.96; sp.vy *= 0.96;
+      if (sp.life >= 1) { starSparkles.splice(s, 1); continue; }
+      ctx.fillStyle = "rgba(255,245,200," + (1 - sp.life) + ")"; ctx.beginPath(); ctx.arc(sp.x, sp.y, 3 * (1 - sp.life) + 1, 0, 6.29); ctx.fill();
+    }
+  }
+  // =================== END STARDUST TRAIL ====================
+
+  // ===================== HOW DO YOU FEEL ======================
+  // brow > 0 raises the inner ends (sad / surprised), ~0 is relaxed
+  var FEELINGS = [
+    { name: "Happy", eye: 1.0, mouth: 1.0, brow: 0.1, open: 0 },
+    { name: "Sad", eye: 0.7, mouth: -1.0, brow: 0.7, open: 0 },
+    { name: "Sleepy", eye: 0.16, mouth: 0.2, brow: 0.0, open: 0 },
+    { name: "Surprised", eye: 1.3, mouth: 0.0, brow: 0.5, open: 1 }
+  ];
+  var feelCur = { eye: 1, mouth: 1, brow: 0.1, open: 0 };
+  var feelIdx = 0;
+  var feelRandom = true;
+  var feelLabels = true;
+  function initFeel() { feelIdx = 0; var f = FEELINGS[0]; feelCur = { eye: f.eye, mouth: f.mouth, brow: f.brow, open: f.open }; }
+  function feelDown() {
+    var ni;
+    if (feelRandom) { do { ni = (Math.random() * FEELINGS.length) | 0; } while (ni === feelIdx && FEELINGS.length > 1); }
+    else ni = (feelIdx + 1) % FEELINGS.length;
+    feelIdx = ni; speak(FEELINGS[ni].name, feelLabels);
+  }
+  function drawFace(f) {
+    var cx = W * 0.5, cy = H * 0.5, R = Math.min(W, H) * 0.26;
+    ctx.fillStyle = "#ffd54a"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "rgba(255,150,150,0.3)"; ctx.beginPath(); ctx.arc(cx - R * 0.5, cy + R * 0.18, R * 0.14, 0, 6.29); ctx.arc(cx + R * 0.5, cy + R * 0.18, R * 0.14, 0, 6.29); ctx.fill();
+    var ex = R * 0.38, ey = cy - R * 0.12, eh = R * 0.18 * f.eye + R * 0.02;
+    ctx.fillStyle = "#3a2a20"; ctx.beginPath(); ctx.ellipse(cx - ex, ey, R * 0.12, eh, 0, 0, 6.29); ctx.ellipse(cx + ex, ey, R * 0.12, eh, 0, 0, 6.29); ctx.fill();
+    ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = R * 0.05; ctx.lineCap = "round";
+    var by = cy - R * 0.42, ba = f.brow;
+    ctx.beginPath(); ctx.moveTo(cx - ex - R * 0.14, by + ba * R * 0.18); ctx.lineTo(cx - ex + R * 0.14, by - ba * R * 0.18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + ex - R * 0.14, by - ba * R * 0.18); ctx.lineTo(cx + ex + R * 0.14, by + ba * R * 0.18); ctx.stroke();
+    var my = cy + R * 0.36;
+    if (f.open > 0.4) { ctx.fillStyle = "#7a3b3b"; ctx.beginPath(); ctx.ellipse(cx, my, R * 0.16, R * 0.16 * Math.max(0.4, f.open), 0, 0, 6.29); ctx.fill(); }
+    else { ctx.strokeStyle = "#7a3b3b"; ctx.lineWidth = R * 0.05; ctx.beginPath(); ctx.moveTo(cx - R * 0.22, my); ctx.quadraticCurveTo(cx, my + f.mouth * R * 0.3, cx + R * 0.22, my); ctx.stroke(); }
+  }
+  function drawFeelFrame() {
+    var g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#fdf0d5"); g.addColorStop(1, "#ffe1c4");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var tgt = FEELINGS[feelIdx], spd = 0.02 + (parseInt(fSpeedEl.value, 10) / 100) * 0.13;
+    feelCur.eye += (tgt.eye - feelCur.eye) * spd; feelCur.mouth += (tgt.mouth - feelCur.mouth) * spd;
+    feelCur.brow += (tgt.brow - feelCur.brow) * spd; feelCur.open += (tgt.open - feelCur.open) * spd;
+    drawFace(feelCur);
+  }
+  // =================== END HOW DO YOU FEEL ====================
+
+  function drawBubblesFrame() {
     drawBackground();
 
     if (running && analyser) {
@@ -1102,6 +1796,27 @@
     if (bubbles.length > 400) bubbles.splice(0, bubbles.length - 400);
 
     drawPops();
+  }
+
+  // ---- Mode registry: each mode draws its own frame and handles its own input ----
+  var MODES = {
+    bubbles:  { panel: panel,        draw: drawBubblesFrame,  down: function (x, y) { hitTest(x, y); } },
+    birds:    { panel: birdPanel,    draw: function () { drawSky(); updateAndDrawBirds(); }, down: function (x, y) { birdTap(x, y); }, init: function () { if (birds.length === 0) initBirds(); } },
+    animals:  { panel: animalPanel,  draw: drawAnimalsFrame,   down: animalDown,  init: initAnimals },
+    piano:    { panel: pianoPanel,   draw: drawPianoFrame,     down: pianoDown,   up: pianoUp,   teardown: pianoTeardown },
+    daynight: { panel: dayPanel,     draw: drawDayNightFrame,  down: dayDown,     init: initDayNight },
+    stardust: { panel: starPanel,    draw: drawStarFrame,      down: starDown,    move: starMove, teardown: starTeardown, init: initStar },
+    feelings: { panel: feelPanel,    draw: drawFeelFrame,      down: feelDown,    init: initFeel },
+    calm:     { panel: calmPanel,    draw: drawCalmScene,      down: function (x, y) { calmTap(x, y); }, init: function () { if (calmStars.length === 0) initCalm(); } }
+    // TODO (out of scope this pass, captured for later):
+    //   knock: Knock-Knock   - tap doors to reveal and name who peeks
+    //   stack: Stack & Topple - tap to stack blocks, soft wobble, gentle collapse with counting
+  };
+  var ALL_PANELS = [panel, birdPanel, calmPanel, animalPanel, pianoPanel, dayPanel, starPanel, feelPanel];
+
+  function loop() {
+    var m = MODES[screen];
+    if (m && m.draw) m.draw();
     requestAnimationFrame(loop);
   }
 
@@ -1119,9 +1834,21 @@
     return false;
   }
   canvas.addEventListener("pointerdown", function (e) {
-    if (screen === "birds") { birdTap(e.clientX, e.clientY); return; }
-    if (screen === "calm") { calmTap(e.clientX, e.clientY); return; }
-    hitTest(e.clientX, e.clientY);
+    userGestured = true;
+    var m = MODES[screen];
+    if (m && m.down) m.down(e.clientX, e.clientY, e);
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    var m = MODES[screen];
+    if (m && m.move && (e.buttons || e.pointerType === "touch")) m.move(e.clientX, e.clientY, e);
+  });
+  window.addEventListener("pointerup", function (e) {
+    var m = MODES[screen];
+    if (m && m.up) m.up(e);
+  });
+  window.addEventListener("pointercancel", function (e) {
+    var m = MODES[screen];
+    if (m && m.up) m.up(e);
   });
   window.addEventListener("keydown", calmKeyDown, true);
   window.addEventListener("keyup", calmKeyUp, true);
@@ -1189,11 +1916,45 @@
     if (calmLock) enterKioskLock(); else exitKioskLock();
   });
 
+  // ---- Animal Friends settings ----
+  bindLabel(aCountEl, document.getElementById("aCountVal"));
+  bindLabel(aSpeedEl, document.getElementById("aSpeedVal"));
+  bindSeg(document.getElementById("aSetSeg"), function (m) { animalSet = m; initAnimals(); });
+  bindSeg(document.getElementById("aSoundSeg"), function (m) { animalSounds = (m === "on"); });
+  bindSeg(document.getElementById("aNameSeg"), function (m) { animalNames = (m === "on"); });
+  aCountEl.addEventListener("change", function () { if (screen === "animals") initAnimals(); });
+
+  // ---- Color Piano settings ----
+  bindLabel(pBloomEl, document.getElementById("pBloomVal"));
+  bindSeg(document.getElementById("pKeysSeg"), function (m) { pianoTeardown(); pianoKeys = parseInt(m, 10); });
+  bindSeg(document.getElementById("pSustainSeg"), function (m) { pianoPad = (m === "pad"); });
+  bindSeg(document.getElementById("pColorSeg"), function (m) { pianoColorNames = (m === "on"); });
+
+  // ---- Day & Night settings ----
+  bindLabel(dSpeedEl, document.getElementById("dSpeedVal"));
+  bindSeg(document.getElementById("dLabelSeg"), function (m) { dayLabels = (m === "on"); });
+  bindSeg(document.getElementById("dCritterSeg"), function (m) { dayCritter = (m === "on"); });
+  bindSeg(document.getElementById("dMotionSeg"), function (m) { dayClouds = (m === "drift"); });
+
+  // ---- Stardust Trail settings ----
+  bindLabel(sFadeEl, document.getElementById("sFadeVal"));
+  bindLabel(sSparkEl, document.getElementById("sSparkVal"));
+  bindSeg(document.getElementById("sThemeSeg"), function (m) { starTheme = m; });
+  bindSeg(document.getElementById("sSoundSeg"), function (m) { starSounds = (m === "on"); });
+  bindSeg(document.getElementById("sGuideSeg"), function (m) { starGuides = m; starGuideIdx = 0; nextGuide(); });
+
+  // ---- How Do You Feel settings ----
+  bindLabel(fSpeedEl, document.getElementById("fSpeedVal"));
+  bindSeg(document.getElementById("fOrderSeg"), function (m) { feelRandom = (m === "random"); });
+  bindSeg(document.getElementById("fLabelSeg"), function (m) { feelLabels = (m === "on"); });
+
   gear.addEventListener("click", function () {
-    var active = (screen === "birds") ? birdPanel : (screen === "calm") ? calmPanel : panel;
-    [panel, birdPanel, calmPanel].forEach(function (p) { if (p !== active) p.classList.remove("open"); });
-    active.classList.toggle("open");
-    gear.classList.toggle("open", active.classList.contains("open"));
+    var active = MODES[screen].panel;
+    ALL_PANELS.forEach(function (p) { if (p !== active) p.classList.remove("open"); });
+    if (active) {
+      active.classList.toggle("open");
+      gear.classList.toggle("open", active.classList.contains("open"));
+    }
   });
 
   // ---- Start ----
@@ -1224,48 +1985,45 @@
   });
 
   // ---- Tabs ----
-  var tabBubbles = document.getElementById("tabBubbles");
-  var tabBirds = document.getElementById("tabBirds");
-  var tabCalm = document.getElementById("tabCalm");
+  var tabsEl = document.getElementById("tabs");
 
   function applyScreen() {
-    tabBubbles.classList.toggle("active", screen === "bubbles");
-    tabBirds.classList.toggle("active", screen === "birds");
-    tabCalm.classList.toggle("active", screen === "calm");
-    panel.classList.remove("open");
-    birdPanel.classList.remove("open");
-    calmPanel.classList.remove("open");
+    var btns = tabsEl.children, activeBtn = null;
+    for (var i = 0; i < btns.length; i++) {
+      var on = btns[i].getAttribute("data-screen") === screen;
+      btns[i].classList.toggle("active", on);
+      if (on) activeBtn = btns[i];
+    }
+    ALL_PANELS.forEach(function (p) { p.classList.remove("open"); });
     gear.classList.remove("open");
-    if (screen === "bubbles") {
-      if (running) {
-        overlay.classList.add("hidden");
-        gear.classList.remove("start-hidden");
-      } else {
-        overlay.classList.remove("hidden");  // let them Start the mic for bubbles
-        gear.classList.add("start-hidden");
-      }
+    if (screen === "bubbles" && !running) {
+      overlay.classList.remove("hidden");   // let them Start the mic for bubbles
+      gear.classList.add("start-hidden");
     } else {
-      // birds & calm need no mic; hide the overlay and show their gear
-      overlay.classList.add("hidden");
+      overlay.classList.add("hidden");       // every other mode needs no mic
       gear.classList.remove("start-hidden");
     }
+    if (activeBtn) { try { activeBtn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } catch (e) { /* ignore */ } }
   }
 
-  tabBirds.addEventListener("click", function () {
-    screen = "birds";
-    ensureAudio();                 // tap is a user gesture -> ok to start audio
-    if (birds.length === 0) initBirds();
+  function selectMode(key) {
+    if (!MODES[key]) return;
+    if (key !== screen) {
+      var prev = MODES[screen];
+      if (prev && prev.teardown) prev.teardown();   // stop the old mode's audio/work
+    }
+    screen = key;
+    userGestured = true;
+    ensureAudio();                                   // tab tap is a user gesture
+    var m = MODES[screen];
+    if (m && m.init) m.init();
     applyScreen();
-  });
-  tabBubbles.addEventListener("click", function () {
-    screen = "bubbles";
-    applyScreen();
-  });
-  tabCalm.addEventListener("click", function () {
-    screen = "calm";
-    ensureAudio();
-    if (calmStars.length === 0) initCalm();
-    applyScreen();
+  }
+
+  tabsEl.addEventListener("click", function (e) {
+    var btn = e.target.closest(".tab");
+    if (!btn) return;
+    selectMode(btn.getAttribute("data-screen"));
   });
 
   // when the mic starts, refresh tab UI (so the gear shows on the bubbles tab)
