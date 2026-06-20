@@ -206,6 +206,22 @@
     </div>
     <div class="hint">A gentle chime when the screen is touched.</div>
   </div>
+  <div class="row">
+    <label>Keyboard keys</label>
+    <div class="seg" id="cKeysSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">Pressing any key makes the bear chime and float a heart.</div>
+  </div>
+  <div class="row">
+    <label>Lock keyboard</label>
+    <div class="seg" id="cLockSeg">
+      <button type="button" data-mode="on">On</button>
+      <button type="button" data-mode="off" class="active">Off</button>
+    </div>
+    <div class="hint">Go fullscreen and stop keys from reaching the browser, so he can mash the keyboard safely. Turn Off (or press Esc) to exit. Note: macOS system shortcuts like Cmd+Tab can't be blocked by a webpage — use Guided Access on iPad for a full lock.</div>
+  </div>
 </div>
 
 <div id="overlay">
@@ -787,6 +803,9 @@
   // heart floats up with a soft chime. Designed to barely move.
   var calmT = 0;
   var calmSound = true;
+  var calmKeys = true;     // keyboard keys make the bear chime
+  var calmLock = false;    // swallow key presses so they don't reach the browser/OS
+  var calmPulse = 0;       // brief gentle bounce when touched / a key is pressed
   var calmStars = [];
   var calmFloaters = [];
 
@@ -800,10 +819,10 @@
     }
   }
 
-  function softChime() {
+  function softChime(freq) {
     if (!actx || !calmSound) return;
     var notes = [523.25, 587.33, 659.25, 783.99, 880.0]; // gentle pentatonic
-    var f = notes[(Math.random() * notes.length) | 0];
+    var f = freq || notes[(Math.random() * notes.length) | 0];
     var t = actx.currentTime;
     var o = actx.createOscillator(), g = actx.createGain();
     o.type = "sine";
@@ -830,7 +849,7 @@
   function drawTigerCub(motion) {
     var cx = W * 0.5 + Math.sin(calmT * 0.3) * 8 * motion;     // gentle sway
     var cy = H * 0.55 + Math.sin(calmT * 0.5) * 4 * motion;    // gentle bob
-    var breathe = 1 + Math.sin(calmT * 0.8) * 0.03 * motion;   // slow breathing
+    var breathe = 1 + Math.sin(calmT * 0.8) * 0.03 * motion + calmPulse * 0.06; // breathing + gentle bounce
     var R = Math.min(W, H) * 0.16;
     var blinking = (calmT % 5) < 0.16;                          // blink every 5s
 
@@ -901,6 +920,7 @@
   function drawCalmScene() {
     var motion = parseInt(calmMotion.value, 10) / 100;  // 0..1 amount of movement
     calmT += 0.016;
+    calmPulse *= 0.9; if (calmPulse < 0.001) calmPulse = 0;   // bounce settles quickly
 
     // soft, slowly drifting pastel sky (lavender -> peach)
     var t = calmT * 0.03;
@@ -941,13 +961,55 @@
     }
   }
 
-  function calmTap(x, y) {
+  function calmBurst(x, y, freq) {
     ensureAudio();
     calmFloaters.push({
       x: x, y: y, vy: -0.35, r: 13 + Math.random() * 10,
       a: 0, life: 0, hue: 330 + Math.random() * 40
     });
-    softChime();
+    calmPulse = 1;          // gentle bounce
+    softChime(freq);
+  }
+
+  function calmTap(x, y) {
+    calmBurst(x, y);
+  }
+
+  // a key press chimes "with the bear": a heart floats up near the cub and
+  // the same key always plays the same note, for clear cause and effect
+  function calmKeyDown(e) {
+    if (screen !== "calm") return;
+    if (calmLock) { e.preventDefault(); e.stopPropagation(); }  // swallow it
+    if (!calmKeys || e.repeat) return;
+    var notes = [392, 440, 493.88, 523.25, 587.33, 659.25, 783.99, 880];
+    var code = (e.key && e.key.length === 1) ? e.key.toUpperCase().charCodeAt(0) : (e.keyCode || 65);
+    var f = notes[code % notes.length];
+    var bx = W * 0.5 + (Math.random() - 0.5) * W * 0.3;
+    var by = H * 0.5 + (Math.random() - 0.5) * 60;
+    calmBurst(bx, by, f);
+  }
+  function calmKeyUp(e) {
+    if (screen === "calm" && calmLock) { e.preventDefault(); e.stopPropagation(); }
+  }
+
+  // Best-effort "kiosk" lock: go fullscreen and grab the Keyboard Lock API so
+  // browser shortcuts (Cmd/Ctrl+W/T/R, Esc, F-keys) don't fire. Note: macOS
+  // reserves some system shortcuts (Cmd+Tab/Cmd+Q) that the web cannot block.
+  function enterKioskLock() {
+    var el = document.documentElement;
+    var rfs = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (rfs) { try { rfs.call(el); } catch (e) { /* ignore */ } }
+    if (navigator.keyboard && navigator.keyboard.lock) {
+      try { navigator.keyboard.lock(); } catch (e) { /* needs fullscreen + https */ }
+    }
+  }
+  function exitKioskLock() {
+    if (navigator.keyboard && navigator.keyboard.unlock) {
+      try { navigator.keyboard.unlock(); } catch (e) { /* ignore */ }
+    }
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try { document.exitFullscreen(); } catch (e) { /* ignore */ }
+    }
   }
   // =================== END CALM =====================
 
@@ -1061,6 +1123,8 @@
     if (screen === "calm") { calmTap(e.clientX, e.clientY); return; }
     hitTest(e.clientX, e.clientY);
   });
+  window.addEventListener("keydown", calmKeyDown, true);
+  window.addEventListener("keyup", calmKeyUp, true);
 
   // ---- Settings ----
   function bindLabel(el, label) {
@@ -1115,6 +1179,14 @@
   bindSeg(document.getElementById("cSoundSeg"), function (m) {
     calmSound = (m === "on");
     if (calmSound) ensureAudio();
+  });
+  bindSeg(document.getElementById("cKeysSeg"), function (m) {
+    calmKeys = (m === "on");
+    if (calmKeys) ensureAudio();
+  });
+  bindSeg(document.getElementById("cLockSeg"), function (m) {
+    calmLock = (m === "on");
+    if (calmLock) enterKioskLock(); else exitKioskLock();
   });
 
   gear.addEventListener("click", function () {
