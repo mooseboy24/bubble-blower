@@ -52,7 +52,7 @@
   #gear:hover, #gear.open { opacity: 1; transform: rotate(40deg); }
   #gear.start-hidden { display: none; }
 
-  #panel {
+  #panel, #birdPanel {
     position: fixed; top: max(64px, calc(env(safe-area-inset-top) + 56px)); right: 12px; z-index: 16;
     width: min(280px, 86vw); padding: 18px; border-radius: 18px;
     /* keep the panel inside the screen on small phones and let it scroll */
@@ -64,8 +64,8 @@
     transform: translateY(-10px) scale(0.96); opacity: 0; pointer-events: none;
     transition: transform 0.18s ease, opacity 0.18s ease;
   }
-  #panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-  #panel h2 { font-size: 16px; margin-bottom: 14px; font-weight: 700; }
+  #panel.open, #birdPanel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+  #panel h2, #birdPanel h2 { font-size: 16px; margin-bottom: 14px; font-weight: 700; }
   .row { margin-bottom: 16px; }
   .row label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; font-weight: 600; }
   .row .val { opacity: 0.7; font-variant-numeric: tabular-nums; }
@@ -82,8 +82,8 @@
   .seg button.active { background: linear-gradient(160deg, #ff9a5a, #ff5e7e); box-shadow: 0 3px 10px rgba(0,0,0,0.25); }
   /* tighten spacing on short phone screens so the whole panel fits */
   @media (max-height: 740px) {
-    #panel { padding: 14px; }
-    #panel h2 { margin-bottom: 10px; }
+    #panel, #birdPanel { padding: 14px; }
+    #panel h2, #birdPanel h2 { margin-bottom: 10px; }
     .row { margin-bottom: 11px; }
     .hint { margin-top: 3px; }
   }
@@ -155,6 +155,41 @@
   </div>
 </div>
 
+<div id="birdPanel">
+  <h2>Birdies</h2>
+  <div class="row">
+    <label>Bird size <span class="val" id="bSizeVal"></span></label>
+    <input type="range" id="bSize" min="40" max="180" value="100" />
+    <div class="hint">How big the birds are.</div>
+  </div>
+  <div class="row">
+    <label>Size variety</label>
+    <div class="seg" id="bSizeSeg">
+      <button type="button" data-mode="random" class="active">Random</button>
+      <button type="button" data-mode="same">All same</button>
+    </div>
+    <div class="hint">Random: a mix of big and little birds. All same: one size.</div>
+  </div>
+  <div class="row">
+    <label>Fly speed <span class="val" id="bSpeedVal"></span></label>
+    <input type="range" id="bSpeed" min="30" max="200" value="100" />
+    <div class="hint">How fast the birds zip around.</div>
+  </div>
+  <div class="row">
+    <label>Flock size <span class="val" id="bFlockVal"></span></label>
+    <input type="range" id="bFlock" min="3" max="30" value="18" />
+    <div class="hint">The most birds that can be on screen at once.</div>
+  </div>
+  <div class="row">
+    <label>Chirp sounds</label>
+    <div class="seg" id="bSoundSeg">
+      <button type="button" data-mode="on" class="active">On</button>
+      <button type="button" data-mode="off">Off</button>
+    </div>
+    <div class="hint">Turn the tweets on or off for quiet time.</div>
+  </div>
+</div>
+
 <div id="overlay">
   <div class="emoji">&#128690;</div>
   <div id="title">Bubble Blower</div>
@@ -185,6 +220,13 @@
   var spreadVal = document.getElementById("spreadVal");
   var lvlVal = document.getElementById("lvlVal");
   var meterFill = document.getElementById("meterFill");
+  var birdPanel = document.getElementById("birdPanel");
+  var bSize = document.getElementById("bSize");
+  var bSizeVal = document.getElementById("bSizeVal");
+  var bSpeed = document.getElementById("bSpeed");
+  var bSpeedVal = document.getElementById("bSpeedVal");
+  var bFlock = document.getElementById("bFlock");
+  var bFlockVal = document.getElementById("bFlockVal");
 
   var W = 0, H = 0, DPR = 1;
   function resize() {
@@ -458,6 +500,8 @@
   var birds = [];
   var clouds = [];
   var actx = null;                 // separate AudioContext for chirps (no mic needed)
+  var birdSizeMode = "random";     // "random" | "same"
+  var soundOn = true;              // chirp sounds on/off
 
   var BIRD_KINDS = [
     { body: "#e74c3c", wing: "#c0392b", belly: "#ffe0c2", chirp: 880 },  // red
@@ -480,16 +524,19 @@
 
   function spawnBird(o) {
     var k = BIRD_KINDS[(Math.random() * BIRD_KINDS.length) | 0];
+    var base = parseInt(bSize.value, 10) / 100;   // size slider -> multiplier
+    var sz = (birdSizeMode === "random") ? base * (0.65 + Math.random() * 0.7) : base;
     birds.push({
       x: o.x, y: o.y, tx: o.tx, ty: o.ty,
-      vx: 0, vy: 0, size: 0.85 + Math.random() * 0.55,
+      vx: 0, vy: 0, size: sz,
       kind: k, flap: Math.random() * 6.28, dir: 1, bob: Math.random() * 6.28,
       spin: 0, pause: 0
     });
   }
 
   function initBirds() {
-    for (var i = 0; i < 4; i++) {
+    var n = Math.min(4, parseInt(bFlock.value, 10));
+    for (var i = 0; i < n; i++) {
       var bx = 60 + Math.random() * (W - 120);
       var by = skyTop() + Math.random() * (skyBottom() - skyTop());
       spawnBird({ x: bx, y: by, tx: bx, ty: by });
@@ -515,7 +562,7 @@
 
   // Two quick rising-then-settling notes = a cute tweet. Pitch varies by bird.
   function chirp(base) {
-    if (!actx) return;
+    if (!actx || !soundOn) return;
     var t = actx.currentTime;
     for (var n = 0; n < 2; n++) {
       var o = actx.createOscillator();
@@ -629,15 +676,16 @@
   }
 
   function updateAndDrawBirds() {
+    var sf = parseInt(bSpeed.value, 10) / 100;   // fly-speed multiplier
+    var accel = 0.22 * sf;
+    var maxsp = 3.6 * sf;
     for (var i = birds.length - 1; i >= 0; i--) {
       var b = birds[i];
       var dx = b.tx - b.x, dy = b.ty - b.y;
       var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      var accel = 0.22;
       b.vx += (dx / dist) * accel;
       b.vy += (dy / dist) * accel;
       var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      var maxsp = 3.6;
       if (sp > maxsp) { b.vx *= maxsp / sp; b.vy *= maxsp / sp; }
       b.vx *= 0.93; b.vy *= 0.93;
       b.bob += 0.12;
@@ -696,7 +744,7 @@
       b.vy -= 4.5; b.vx += (Math.random() - 0.5) * 3;
       scatterFrom(x, y);
     } else {
-      if (birds.length < 18) {
+      if (birds.length < parseInt(bFlock.value, 10)) {
         var left = x, right = W - x, top = y, bot = H - y;
         var m = Math.min(left, right, top, bot);
         var ex, ey;
@@ -839,9 +887,38 @@
     }
   });
 
+  // ---- Birdies settings ----
+  function bindX(el, label) {
+    function u() { label.textContent = (el.value / 100).toFixed(1) + "x"; }
+    el.addEventListener("input", u);
+    u();
+  }
+  bindX(bSize, bSizeVal);
+  bindX(bSpeed, bSpeedVal);
+  bindLabel(bFlock, bFlockVal);
+
+  function bindSeg(seg, onPick) {
+    seg.addEventListener("click", function (e) {
+      var btn = e.target.closest("button");
+      if (!btn) return;
+      for (var i = 0; i < seg.children.length; i++) {
+        seg.children[i].classList.toggle("active", seg.children[i] === btn);
+      }
+      onPick(btn.getAttribute("data-mode"));
+    });
+  }
+  bindSeg(document.getElementById("bSizeSeg"), function (m) { birdSizeMode = m; });
+  bindSeg(document.getElementById("bSoundSeg"), function (m) {
+    soundOn = (m === "on");
+    if (soundOn) ensureAudio();
+  });
+
   gear.addEventListener("click", function () {
-    panel.classList.toggle("open");
-    gear.classList.toggle("open");
+    var active = (screen === "birds") ? birdPanel : panel;
+    var other = (screen === "birds") ? panel : birdPanel;
+    other.classList.remove("open");
+    active.classList.toggle("open");
+    gear.classList.toggle("open", active.classList.contains("open"));
   });
 
   // ---- Start ----
@@ -878,11 +955,12 @@
   function applyScreen() {
     tabBubbles.classList.toggle("active", screen === "bubbles");
     tabBirds.classList.toggle("active", screen === "birds");
+    panel.classList.remove("open");
+    birdPanel.classList.remove("open");
+    gear.classList.remove("open");
     if (screen === "birds") {
       overlay.classList.add("hidden");
-      panel.classList.remove("open");
-      gear.classList.remove("open");
-      gear.classList.add("start-hidden");   // no mic settings in the birds game
+      gear.classList.remove("start-hidden");   // gear opens the Birdies settings
     } else {
       if (running) {
         overlay.classList.add("hidden");
